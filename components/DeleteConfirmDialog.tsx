@@ -39,7 +39,7 @@ export function DeleteConfirmDialog({
             {itemName && (
               <span className="font-semibold text-foreground">
                 {" "}
-                "{itemName}"?
+                &quot;{itemName}&quot;?
               </span>
             )}
           </DialogDescription>

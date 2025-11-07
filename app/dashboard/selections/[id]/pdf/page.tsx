@@ -88,7 +88,7 @@ export default async function SelectionPDFPage({ params }: PageProps) {
       return (
         <div style={{ padding: "2rem", textAlign: "center" }}>
           <h1>Selection not found</h1>
-          <p>The selection you're looking for doesn't exist or you don't have access to it.</p>
+          <p>The selection you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.</p>
         </div>
       )
     }

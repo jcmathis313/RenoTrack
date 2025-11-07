@@ -138,7 +138,7 @@ export function CreateInspectionModal({
           <DialogHeader>
             <DialogTitle>Create New Inspection</DialogTitle>
             <DialogDescription>
-              Select a completed selection to create an inspection. Only selections with status "complete" are available.
+              Select a completed selection to create an inspection. Only selections with status &quot;complete&quot; are available.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

@@ -140,7 +140,7 @@ export function CreateAssessmentModal({
         <DialogHeader>
           <DialogTitle>Create Assessment</DialogTitle>
           <DialogDescription>
-            Create a new assessment for a unit. You'll be able to add rooms and components after creation.
+            Create a new assessment for a unit. You&apos;ll be able to add rooms and components after creation.
           </DialogDescription>
         </DialogHeader>
 

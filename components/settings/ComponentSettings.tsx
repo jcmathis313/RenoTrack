@@ -585,7 +585,7 @@ export function ComponentSettings() {
           <DialogHeader>
             <DialogTitle>Delete {deleteType === "category" ? "Category" : "Component"}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{selectedItem?.name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{selectedItem?.name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
