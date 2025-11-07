@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -36,7 +36,7 @@ interface Assessment {
   }
 }
 
-export default function AssessmentsPage() {
+function AssessmentsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [assessments, setAssessments] = useState<Assessment[]>([])
@@ -166,5 +166,29 @@ export default function AssessmentsPage() {
         initialUnitId={searchParams?.get("unitId") || undefined}
       />
     </div>
+  )
+}
+
+export default function AssessmentsPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Assessments</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage and track unit assessments
+            </p>
+          </div>
+        </div>
+        <Card>
+          <CardContent>
+            <div className="text-center py-8">Loading...</div>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <AssessmentsContent />
+    </Suspense>
   )
 }
