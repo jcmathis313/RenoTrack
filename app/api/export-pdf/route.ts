@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import puppeteer from "puppeteer"
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(request: NextRequest) {
   let browser: any = null
   try {

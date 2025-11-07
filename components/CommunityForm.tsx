@@ -90,8 +90,9 @@ export function CommunityForm({ open, onOpenChange, community }: CommunityFormPr
       }
 
       const { logoUrl } = await response.json()
-      setFormData({ ...formData, logoUrl })
       setLogoPreview(logoUrl)
+      // Update formData state if it exists (for editing)
+      setFormData((prev) => ({ ...prev, logoUrl: logoUrl || null }))
     } catch (err) {
       console.error("Logo upload error:", err)
       setError(err instanceof Error ? err.message : "Failed to upload logo")

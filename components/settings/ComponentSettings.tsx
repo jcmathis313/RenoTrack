@@ -407,7 +407,11 @@ export function ComponentSettings() {
                                     size="sm"
                                     onClick={() => {
                                       setAddingComponentCategoryId(category.id)
-                                      setExpandedCategories(new Set([...expandedCategories, category.id]))
+                                      setExpandedCategories((prev) => {
+                                        const newSet = new Set(prev)
+                                        newSet.add(category.id)
+                                        return newSet
+                                      })
                                     }}
                                   >
                                     <span className="text-xs">+ Component</span>

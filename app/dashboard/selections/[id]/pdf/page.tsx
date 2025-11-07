@@ -121,6 +121,11 @@ export default async function SelectionPDFPage({ params }: PageProps) {
   // Attach catalog items to components
   const selectionWithMaterials = {
     ...selection,
+    createdAt: selection.createdAt.toISOString(),
+    assessment: selection.assessment ? {
+      ...selection.assessment,
+      assessedAt: selection.assessment.assessedAt.toISOString(),
+    } : null,
     designRooms: selection.designRooms.map((room) => ({
       ...room,
       designComponents: room.designComponents.map((comp) => ({

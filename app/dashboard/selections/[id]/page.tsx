@@ -453,14 +453,14 @@ export default function SelectionDetailPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          componentType: editingComponent.componentType,
-          condition: editingComponent.condition?.trim() || null,
-          materialId: editingComponent.materialId?.trim() || null,
-          notes: editingComponent.notes?.trim() || null,
-          residentUpgrade: editingComponent.residentUpgrade === "upgrade" ? true : editingComponent.residentUpgrade === "included" ? false : null,
-          quantity: editingComponent.quantity || 1,
-          unitCost: editingComponent.unitCost || 0,
-          totalCost: (editingComponent.quantity || 1) * (editingComponent.unitCost || 0),
+          componentType: editingComponent?.componentType || "",
+          condition: editingComponent?.condition?.trim() || null,
+          materialId: editingComponent?.materialId?.trim() || null,
+          notes: editingComponent?.notes?.trim() || null,
+          residentUpgrade: editingComponent?.residentUpgrade === "upgrade" ? true : editingComponent?.residentUpgrade === "included" ? false : null,
+          quantity: editingComponent?.quantity || 1,
+          unitCost: editingComponent?.unitCost || 0,
+          totalCost: (editingComponent?.quantity || 1) * (editingComponent?.unitCost || 0),
         }),
       })
 
@@ -894,7 +894,11 @@ export default function SelectionDetailPage() {
                             checked={group.components.length > 0 && group.components.every((c) => selectedComponentIds.has(c.id))}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                group.components.forEach((c) => setSelectedComponentIds((prev) => new Set([...prev, c.id])))
+                                group.components.forEach((c) => setSelectedComponentIds((prev) => {
+                                  const newSet = new Set(prev)
+                                  newSet.add(c.id)
+                                  return newSet
+                                }))
                               } else {
                                 group.components.forEach((c) =>
                                   setSelectedComponentIds((prev) => {
@@ -981,14 +985,13 @@ export default function SelectionDetailPage() {
                               <div className="mt-2 space-y-2">
                                 <Label className="text-xs">Condition</Label>
                                 <Select
-                                  value={editingComponent.condition || undefined}
+                                  value={editingComponent?.condition || undefined}
                                   onValueChange={(value) =>
-                                    setEditingComponent({
-                                      ...editingComponent!,
+                                    editingComponent && setEditingComponent({
+                                      ...editingComponent,
                                       condition: value,
                                     })
                                   }
-                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <SelectTrigger onClick={(e) => e.stopPropagation()} className="h-8 text-xs">
                                     <SelectValue placeholder="Select condition" />
@@ -1038,10 +1041,10 @@ export default function SelectionDetailPage() {
                                     }}
                                     className="flex-1 justify-start text-xs h-8"
                                   >
-                                    {editingComponent.materialId ? (
+                                    {editingComponent?.materialId ? (
                                       (() => {
                                         const catalogItem = catalogItems.find(
-                                          (item) => item.id === editingComponent.materialId
+                                          (item) => item.id === editingComponent?.materialId
                                         )
                                         if (catalogItem) {
                                           const manufacturerModelFinish = [
@@ -1075,7 +1078,7 @@ export default function SelectionDetailPage() {
                                       "Select catalog item"
                                     )}
                                   </Button>
-                                  {editingComponent.materialId && (
+                                  {editingComponent?.materialId && editingComponent && (
                                     <Button
                                       type="button"
                                       variant="outline"
@@ -1083,7 +1086,7 @@ export default function SelectionDetailPage() {
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         setEditingComponent({
-                                          ...editingComponent!,
+                                          ...editingComponent,
                                           materialId: "",
                                         })
                                       }}
@@ -1200,10 +1203,10 @@ export default function SelectionDetailPage() {
                           <TableCell className="text-center">
                             {editingComponentId === component.id ? (
                               <RadioGroup
-                                value={editingComponent.residentUpgrade || undefined}
+                                value={editingComponent?.residentUpgrade || undefined}
                                 onValueChange={(value) =>
-                                  setEditingComponent({
-                                    ...editingComponent!,
+                                  editingComponent && setEditingComponent({
+                                    ...editingComponent,
                                     residentUpgrade: value,
                                   })
                                 }
@@ -1242,10 +1245,10 @@ export default function SelectionDetailPage() {
                                   <Label className="text-xs">Quantity</Label>
                                   <Input
                                     type="number"
-                                    value={editingComponent.quantity || 1}
+                                    value={editingComponent?.quantity || 1}
                                     onChange={(e) =>
-                                      setEditingComponent({
-                                        ...editingComponent!,
+                                      editingComponent && setEditingComponent({
+                                        ...editingComponent,
                                         quantity: parseFloat(e.target.value) || 1,
                                       })
                                     }
@@ -1259,10 +1262,10 @@ export default function SelectionDetailPage() {
                                   <Label className="text-xs">Price</Label>
                                   <Input
                                     type="number"
-                                    value={editingComponent.unitCost || 0}
+                                    value={editingComponent?.unitCost || 0}
                                     onChange={(e) =>
-                                      setEditingComponent({
-                                        ...editingComponent!,
+                                      editingComponent && setEditingComponent({
+                                        ...editingComponent,
                                         unitCost: parseFloat(e.target.value) || 0,
                                       })
                                     }
@@ -1288,8 +1291,8 @@ export default function SelectionDetailPage() {
                                 <Textarea
                                   value={editingComponent?.notes || ""}
                                   onChange={(e) =>
-                                    setEditingComponent({
-                                      ...editingComponent!,
+                                    editingComponent && setEditingComponent({
+                                      ...editingComponent,
                                       notes: e.target.value,
                                     })
                                   }
@@ -1377,7 +1380,11 @@ export default function SelectionDetailPage() {
                                 checked={group.components.length > 0 && group.components.every((c) => selectedComponentIds.has(c.id))}
                                 onChange={(e) => {
                                   if (e.target.checked) {
-                                    group.components.forEach((c) => setSelectedComponentIds((prev) => new Set([...prev, c.id])))
+                                    group.components.forEach((c) => setSelectedComponentIds((prev) => {
+                                      const newSet = new Set(prev)
+                                      newSet.add(c.id)
+                                      return newSet
+                                    }))
                                   } else {
                                     group.components.forEach((c) =>
                                       setSelectedComponentIds((prev) => {
@@ -1464,12 +1471,11 @@ export default function SelectionDetailPage() {
                                     <Select
                                       value={editingComponent?.condition || undefined}
                                       onValueChange={(value) =>
-                                        setEditingComponent({
-                                          ...editingComponent!,
+                                        editingComponent && setEditingComponent({
+                                          ...editingComponent,
                                           condition: value,
                                         })
                                       }
-                                      onClick={(e) => e.stopPropagation()}
                                     >
                                       <SelectTrigger onClick={(e) => e.stopPropagation()} className="h-8 text-xs">
                                         <SelectValue placeholder="Select condition" />
@@ -1522,7 +1528,7 @@ export default function SelectionDetailPage() {
                                         {editingComponent?.materialId ? (
                                           (() => {
                                             const catalogItem = catalogItems.find(
-                                              (item) => item.id === editingComponent.materialId
+                                              (item) => item.id === editingComponent?.materialId
                                             )
                                             if (catalogItem) {
                                               const manufacturerModelFinish = [
