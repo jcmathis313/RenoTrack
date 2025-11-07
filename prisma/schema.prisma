@@ -16,17 +16,17 @@ model Tenant {
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  users            User[]
-  communities      Community[]
-  settings         TenantSettings?
-  componentStatus  ComponentStatus[]
-  qualityStatus    QualityStatus[]
-  roomTemplates    RoomTemplate[]
+
+  users               User[]
+  communities         Community[]
+  settings            TenantSettings?
+  componentStatus     ComponentStatus[]
+  qualityStatus       QualityStatus[]
+  roomTemplates       RoomTemplate[]
   componentCategories ComponentCategory[]
-  components       Component[]
-  catalogItems     CatalogItem[]
-  
+  components          Component[]
+  catalogItems        CatalogItem[]
+
   @@index([slug])
 }
 
@@ -39,9 +39,9 @@ model User {
   tenantId  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  
+
   @@unique([email, tenantId])
   @@index([tenantId])
 }
@@ -54,10 +54,10 @@ model Community {
   tenantId  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   buildings Building[]
-  
+
   @@index([tenantId])
 }
 
@@ -68,40 +68,40 @@ model Building {
   communityId String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
   units     Unit[]
-  
+
   @@index([communityId])
 }
 
 model Unit {
-  id        String   @id @default(cuid())
-  number    String
+  id         String   @id @default(cuid())
+  number     String
   buildingId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  building     Building      @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  assessments  Assessment[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  building       Building        @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  assessments    Assessment[]
   designProjects DesignProject[]
-  
+
   @@index([buildingId])
 }
 
 model Assessment {
-  id          String   @id @default(cuid())
-  unitId      String
-  assessedBy  String?
-  assessedAt  DateTime @default(now())
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  unit      Unit              @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  rooms     Room[]
+  id         String   @id @default(cuid())
+  unitId     String
+  assessedBy String?
+  assessedAt DateTime @default(now())
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  unit           Unit            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  rooms          Room[]
   designProjects DesignProject[]
-  
+
   @@index([unitId])
 }
 
@@ -114,59 +114,59 @@ model Room {
   order        Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  
-  assessment        Assessment            @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  assessment           Assessment            @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   componentAssessments ComponentAssessment[]
-  
+
   @@index([assessmentId])
 }
 
 model ComponentAssessment {
-  id              String   @id @default(cuid())
-  roomId          String
-  componentType   String
-  componentName   String?
-  condition       String // "Keep" | "Replace" | "Repair" | "Remove"
-  notes           String?
+  id                String   @id @default(cuid())
+  roomId            String
+  componentType     String
+  componentName     String?
+  condition         String // "Keep" | "Replace" | "Repair" | "Remove"
+  notes             String?
   workDescriptionId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  room            Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
   @@index([roomId])
 }
 
 model DesignProject {
-  id          String   @id @default(cuid())
-  unitId      String
+  id           String   @id @default(cuid())
+  unitId       String
   assessmentId String? // Optional link to assessment
-  name        String
-  status      String? // "Draft" | "In Progress" | "Completed"
-  totalCost   Float?   @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  unit      Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  assessment Assessment?   @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  name         String
+  status       String? // "Draft" | "In Progress" | "Completed"
+  totalCost    Float?   @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  unit        Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  assessment  Assessment?  @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
   designRooms DesignRoom[]
   inspections Inspection[]
-  
+
   @@index([unitId])
   @@index([assessmentId])
 }
 
 model DesignRoom {
-  id            String   @id @default(cuid())
+  id              String   @id @default(cuid())
   designProjectId String
-  name          String
-  type          String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  designProject DesignProject @relation(fields: [designProjectId], references: [id], onDelete: Cascade)
+  name            String
+  type            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  designProject    DesignProject     @relation(fields: [designProjectId], references: [id], onDelete: Cascade)
   designComponents DesignComponent[]
-  
+
   @@index([designProjectId])
 }
 
@@ -185,9 +185,9 @@ model DesignComponent {
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  
+
   designRoom DesignRoom @relation(fields: [designRoomId], references: [id], onDelete: Cascade)
-  
+
   @@index([designRoomId])
 }
 
@@ -199,9 +199,9 @@ model TenantSettings {
   themeColor      String?  @default("blue")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  
+
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  
+
   @@index([tenantId])
 }
 
@@ -214,9 +214,9 @@ model ComponentStatus {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  
+
   @@unique([tenantId, name])
   @@index([tenantId])
 }
@@ -229,9 +229,9 @@ model QualityStatus {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  
+
   @@unique([tenantId, name])
   @@index([tenantId])
 }
@@ -244,9 +244,9 @@ model RoomTemplate {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  
+
   @@unique([tenantId, name])
   @@index([tenantId])
 }
@@ -259,102 +259,102 @@ model ComponentCategory {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  components Component[]
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  components   Component[]
   catalogItems CatalogItem[]
-  
+
   @@unique([tenantId, name])
   @@index([tenantId])
 }
 
 model Component {
-  id               String   @id @default(cuid())
-  tenantId         String
-  categoryId       String
-  name             String
-  order            Int      @default(0)
-  isDefault        Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  
-  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  category ComponentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  tenantId   String
+  categoryId String
+  name       String
+  order      Int      @default(0)
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category     ComponentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   catalogItems CatalogItem[]
-  
+
   @@unique([tenantId, categoryId, name])
   @@index([tenantId])
   @@index([categoryId])
 }
 
 model CatalogItem {
-  id            String   @id @default(cuid())
-  tenantId      String
-  categoryId    String
-  componentId   String
-  description   String?
-  modelNumber   String?
-  manufacturer  String?
-  finish        String?
-  color         String?
-  imageUrl      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  id           String   @id @default(cuid())
+  tenantId     String
+  categoryId   String
+  componentId  String
+  description  String?
+  modelNumber  String?
+  manufacturer String?
+  finish       String?
+  color        String?
+  imageUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   category  ComponentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   component Component         @relation(fields: [componentId], references: [id], onDelete: Cascade)
-  
+
   @@index([tenantId])
   @@index([categoryId])
   @@index([componentId])
 }
 
 model Inspection {
-  id            String   @id @default(cuid())
+  id              String   @id @default(cuid())
   designProjectId String
-  inspectedBy   String?
-  inspectedAt   DateTime @default(now())
-  status        String?  @default("in progress") // "in progress" | "complete"
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  designProject DesignProject @relation(fields: [designProjectId], references: [id], onDelete: Cascade)
+  inspectedBy     String?
+  inspectedAt     DateTime @default(now())
+  status          String?  @default("in progress") // "in progress" | "complete"
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  designProject   DesignProject    @relation(fields: [designProjectId], references: [id], onDelete: Cascade)
   inspectionRooms InspectionRoom[]
-  
+
   @@index([designProjectId])
 }
 
 model InspectionRoom {
-  id            String   @id @default(cuid())
-  inspectionId  String
-  name          String
-  type          String?
-  status        String?  @default("pending") // "pending" | "in progress" | "complete"
-  notes         String?
-  order         Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  inspectionId String
+  name         String
+  type         String?
+  status       String?  @default("pending") // "pending" | "in progress" | "complete"
+  notes        String?
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  inspection           Inspection            @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   inspectionComponents InspectionComponent[]
-  
+
   @@index([inspectionId])
 }
 
 model InspectionComponent {
-  id                String   @id @default(cuid())
-  inspectionRoomId  String
-  componentType     String
-  componentName     String?
-  status            String?  // "pass" | "fail" | null
-  notes             String?
-  imageUrl          String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
+  id               String   @id @default(cuid())
+  inspectionRoomId String
+  componentType    String
+  componentName    String?
+  status           String? // "pass" | "fail" | null
+  notes            String?
+  imageUrl         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
   inspectionRoom InspectionRoom @relation(fields: [inspectionRoomId], references: [id], onDelete: Cascade)
-  
+
   @@index([inspectionRoomId])
 }
