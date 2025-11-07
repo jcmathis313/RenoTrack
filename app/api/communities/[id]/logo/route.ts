@@ -109,6 +109,5 @@ export async function POST(
 }
 
 // Export route config for Next.js 14+
-export const runtime = "nodejs"
 export const maxDuration = 30
 
