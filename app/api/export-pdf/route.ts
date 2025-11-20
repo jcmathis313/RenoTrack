@@ -151,8 +151,9 @@ export async function GET(request: NextRequest) {
       throw new Error(`Failed to launch browser: ${launchError?.message || "Unknown error"}`)
     }
 
+    let page: any = null
     try {
-      const page = await browser.newPage()
+      page = await browser.newPage()
 
       // Set viewport for consistent rendering - use large height to capture all content
       await page.setViewport({
@@ -239,10 +240,13 @@ export async function GET(request: NextRequest) {
 
       console.log("PDF Export: Page loaded, waiting for PDF container...")
       // Wait for content to be ready
-      await page.waitForSelector(".pdf-container", { timeout: 15000 }).catch((selectorError: any) => {
+      try {
+        await page.waitForSelector(".pdf-container", { timeout: 15000 })
+      } catch (selectorError: unknown) {
         console.error("PDF Export: Could not find .pdf-container selector")
-        throw new Error(`PDF content not found: ${selectorError?.message || "Unknown error"}`)
-      })
+        const errorMessage = selectorError instanceof Error ? selectorError.message : "Unknown error"
+        throw new Error(`PDF content not found: ${errorMessage}`)
+      }
 
       // Wait for all images to load - with better error handling
       await page.evaluate(() => {
@@ -251,8 +255,8 @@ export async function GET(request: NextRequest) {
             .filter((img) => !img.complete)
             .map(
               (img) =>
-                new Promise((resolve, reject) => {
-                  img.onload = resolve
+                new Promise<string>((resolve) => {
+                  img.onload = () => resolve("Image loaded")
                   img.onerror = () => {
                     // Hide broken images instead of failing
                     img.style.display = "none"
@@ -266,7 +270,7 @@ export async function GET(request: NextRequest) {
                 })
             )
         )
-      }).then((results) => {
+      }).then((results: PromiseSettledResult<string>[]) => {
         const failed = results.filter((r) => r.status === "rejected").length
         if (failed > 0) {
           console.log(`PDF Export: ${failed} image(s) failed to load, continuing anyway...`)
@@ -339,13 +343,15 @@ export async function GET(request: NextRequest) {
       })
       
       // Try to get more details from the page if possible
-      try {
-        const pageContent = await page.content().catch(() => null)
-        if (pageContent) {
-          console.error("PDF Export: Page content (first 500 chars):", pageContent.substring(0, 500))
+      if (page) {
+        try {
+          const pageContent = await page.content().catch(() => null)
+          if (pageContent) {
+            console.error("PDF Export: Page content (first 500 chars):", pageContent.substring(0, 500))
+          }
+        } catch (contentError: unknown) {
+          console.error("PDF Export: Could not get page content:", contentError)
         }
-      } catch (contentError) {
-        console.error("PDF Export: Could not get page content:", contentError)
       }
       
       if (browser) {
