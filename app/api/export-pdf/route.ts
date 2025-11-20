@@ -400,11 +400,51 @@ export async function GET(request: NextRequest) {
 
       // Wait for CSS to be fully applied and fonts to load
       console.log("PDF Export: Waiting for CSS and fonts to load...")
-      await page.evaluate(() => {
-        return document.fonts.ready
-      }).catch(() => {
-        console.log("PDF Export: Font loading check failed, continuing...")
-      })
+      try {
+        // Wait for all fonts to be loaded
+        await page.evaluate(async () => {
+          await document.fonts.ready
+          
+          // Wait for any external font stylesheets to load
+          const styleSheets = Array.from(document.styleSheets)
+          await Promise.all(
+            styleSheets.map((sheet) => {
+              try {
+                // Access the rules to ensure stylesheet is loaded
+                const rules = sheet.cssRules || sheet.rules
+                return Promise.resolve()
+              } catch (e) {
+                // Cross-origin stylesheet, skip
+                return Promise.resolve()
+              }
+            })
+          )
+          
+          // Ensure all text elements are visible and have proper color
+          const allTextElements = document.querySelectorAll('p, div, span, td, th, h1, h2, h3, h4, h5, h6, label, button')
+          allTextElements.forEach((el) => {
+            if (el instanceof HTMLElement) {
+              const computedStyle = window.getComputedStyle(el)
+              const color = computedStyle.color
+              const visibility = computedStyle.visibility
+              
+              // If text is invisible or transparent, make it visible
+              if (color === 'rgba(0, 0, 0, 0)' || color === 'transparent' || visibility === 'hidden') {
+                el.style.color = '#000000'
+                el.style.visibility = 'visible'
+              }
+              
+              // Ensure text is not hidden by opacity
+              if (computedStyle.opacity === '0') {
+                el.style.opacity = '1'
+              }
+            }
+          })
+        })
+        console.log("PDF Export: Fonts and CSS loaded successfully")
+      } catch (fontError: unknown) {
+        console.warn("PDF Export: Font loading check failed, but continuing:", fontError)
+      }
       
       // Wait a bit more for any dynamic content to render
       await new Promise((resolve) => setTimeout(resolve, 3000))
