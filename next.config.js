@@ -14,6 +14,8 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '10mb',
     },
+    // Ensure Chromium binaries are included in the serverless bundle
+    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
   },
   // Don't fail build on ESLint errors (warnings won't fail anyway)
   eslint: {

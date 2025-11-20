@@ -13,7 +13,10 @@
     },
     "app/api/export-pdf/**/*.ts": {
       "maxDuration": 60,
-      "memory": 1024
+      "memory": 1024,
+      "includeFiles": [
+        "node_modules/@sparticuz/chromium/bin/**"
+      ]
     }
   }
 }
