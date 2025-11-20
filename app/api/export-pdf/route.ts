@@ -194,17 +194,8 @@ export async function GET(request: NextRequest) {
             }
             
             // Puppeteer requires either 'url' or 'domain' to be set
-            // Using 'url' is more reliable across different environments
-            if (isLocalhost) {
-              // For localhost, use URL property
-              cookieObj.url = baseUrl
-            } else {
-              // For Vercel/production, use URL property with the full base URL
-              // This is more reliable than trying to extract domain
-              cookieObj.url = baseUrl
-              // Also set domain for compatibility (without port)
-              cookieObj.domain = urlObj.hostname
-            }
+            // Using 'url' is more reliable across different environments (localhost and Vercel)
+            cookieObj.url = baseUrl
             
             return cookieObj
           })
@@ -219,7 +210,7 @@ export async function GET(request: NextRequest) {
               console.warn(`PDF Export: Failed to set cookie ${cookie.name}:`, cookieError.message)
             }
           }
-          console.log(`PDF Export: Set ${cookieArray.length} cookies${isLocalhost ? ` (localhost, using URL: ${baseUrl})` : ` for domain: ${urlObj.hostname}`}`)
+          console.log(`PDF Export: Set ${cookieArray.length} cookies using URL: ${baseUrl}`)
         }
       } else {
         console.warn("PDF Export: No cookies found in request")
