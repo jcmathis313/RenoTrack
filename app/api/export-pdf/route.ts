@@ -11,8 +11,9 @@ export const maxDuration = 60
 
 // Configure Chromium for Vercel/serverless (if available)
 // Note: setGraphicsMode may not be available in all versions
-if (typeof chromium.setGraphicsMode === 'function') {
-  chromium.setGraphicsMode(false)
+// Using type assertion to avoid TypeScript errors
+if (typeof (chromium as any).setGraphicsMode === 'function') {
+  (chromium as any).setGraphicsMode(false)
 }
 
 export async function GET(request: NextRequest) {
