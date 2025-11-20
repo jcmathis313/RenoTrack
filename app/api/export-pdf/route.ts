@@ -6,6 +6,8 @@ import chromium from "@sparticuz/chromium"
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+// Increase timeout for PDF generation (Vercel default is 10s, max is 60s for Hobby, 300s for Pro)
+export const maxDuration = 60
 
 // Configure Chromium for Vercel/serverless (if available)
 // Note: setGraphicsMode may not be available in all versions
@@ -36,7 +38,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Build the PDF route URL
+    // Use NEXT_PUBLIC_BASE_URL if set, otherwise use the request origin
+    // For Vercel, request.nextUrl.origin will be the deployment URL
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin
+    console.log("PDF Export: Base URL:", baseUrl)
     let pdfRoute = ""
 
     switch (type) {
@@ -119,6 +124,7 @@ export async function GET(request: NextRequest) {
         console.log("PDF Export: Browser launched successfully in development")
       } else {
         // Production (Vercel): Use @sparticuz/chromium
+        console.log("PDF Export: Launching browser in production mode (Vercel)")
         browser = await puppeteer.launch({
           args: [
             ...chromium.args,
@@ -127,11 +133,14 @@ export async function GET(request: NextRequest) {
             "--disable-gpu",
             "--no-sandbox",
             "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--single-process", // Required for serverless
           ],
           defaultViewport: chromium.defaultViewport,
           executablePath: await chromium.executablePath(),
           headless: chromium.headless,
         })
+        console.log("PDF Export: Browser launched successfully in production")
       }
       console.log("PDF Export: Browser launched successfully")
     } catch (launchError: any) {
@@ -157,8 +166,7 @@ export async function GET(request: NextRequest) {
         const cookiePairs = cookieHeader.split(";").map((c) => c.trim())
         const urlObj = new URL(baseUrl)
         
-        // For localhost, omit domain (Puppeteer requires this)
-        // For other domains, use the hostname without port
+        // Determine if we're on localhost or a remote domain (Vercel)
         const isLocalhost = urlObj.hostname === "localhost" || urlObj.hostname === "127.0.0.1"
         
         const cookieArray = cookiePairs
@@ -182,14 +190,20 @@ export async function GET(request: NextRequest) {
               path: "/",
               httpOnly: false,
               secure: baseUrl.startsWith("https"),
-              sameSite: "Lax",
+              sameSite: baseUrl.startsWith("https") ? "None" : "Lax", // Use None for HTTPS cross-site
             }
             
-            // For localhost, use URL instead of domain (Puppeteer requirement)
+            // Puppeteer requires either 'url' or 'domain' to be set
+            // Using 'url' is more reliable across different environments
             if (isLocalhost) {
+              // For localhost, use URL property
               cookieObj.url = baseUrl
             } else {
-              cookieObj.domain = urlObj.hostname.replace(":3000", "").replace(":3001", "").replace(":3002", "")
+              // For Vercel/production, use URL property with the full base URL
+              // This is more reliable than trying to extract domain
+              cookieObj.url = baseUrl
+              // Also set domain for compatibility (without port)
+              cookieObj.domain = urlObj.hostname
             }
             
             return cookieObj
@@ -211,10 +225,10 @@ export async function GET(request: NextRequest) {
         console.warn("PDF Export: No cookies found in request")
       }
 
-      console.log("PDF Export: Navigating to PDF URL...")
+      console.log("PDF Export: Navigating to PDF URL:", pdfUrl)
       const navigationResponse = await page.goto(pdfUrl, {
         waitUntil: "networkidle0",
-        timeout: 30000,
+        timeout: 60000, // Increase timeout for Vercel serverless
       })
 
       if (!navigationResponse) {
