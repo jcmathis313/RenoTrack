@@ -140,7 +140,7 @@ export default function InspectionPDFContent({
 
   return (
     <div
-      className="pdf-container pdf-portrait"
+      className="pdf-container"
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         color: "#1f2937",
@@ -200,61 +200,13 @@ export default function InspectionPDFContent({
         </div>
       </div>
 
-      {/* Executive Summary */}
-      <div className="pdf-section">
-        <div className="pdf-info-card">
-          <div className="pdf-info-column">
-            <div className="pdf-info-heading">Executive Summary</div>
-            <div className="pdf-stats-grid">
-              <div className="pdf-stat-card">
-                <div className="pdf-stat-label">Rooms</div>
-                <div className="pdf-stat-value">{inspection.inspectionRooms.length}</div>
-                <div className="pdf-stat-subtext">Included in this report</div>
-              </div>
-              <div className="pdf-stat-card">
-                <div className="pdf-stat-label">Items Inspected</div>
-                <div className="pdf-stat-value">
-                  {inspection.inspectionRooms.reduce(
-                    (sum, room) => sum + room.inspectionComponents.length,
-                    0
-                  )}
-                </div>
-                <div className="pdf-stat-subtext">Across all rooms</div>
-              </div>
-              <div className="pdf-stat-card">
-                <div className="pdf-stat-label">Passed</div>
-                <div className="pdf-stat-value text-green-600">
-                  {inspection.inspectionRooms.reduce(
-                    (sum, room) =>
-                      sum + room.inspectionComponents.filter((c) => c.status === "pass").length,
-                    0
-                  )}
-                </div>
-                <div className="pdf-stat-subtext">Items passed inspection</div>
-              </div>
-              <div className="pdf-stat-card">
-                <div className="pdf-stat-label">Failed</div>
-                <div className="pdf-stat-value text-red-600">
-                  {inspection.inspectionRooms.reduce(
-                    (sum, room) =>
-                      sum + room.inspectionComponents.filter((c) => c.status === "fail").length,
-                    0
-                  )}
-                </div>
-                <div className="pdf-stat-subtext">Items failed inspection</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Rooms and Components - separate table for each room */}
       {inspection.inspectionRooms && inspection.inspectionRooms.length > 0 ? (
         inspection.inspectionRooms.map((room) => (
         <div key={room.id} className="pdf-section">
           <div className="pdf-group-table-wrapper">
             {/* Room Header */}
-            <div
+            <div 
               className="pdf-group-header"
               style={{
                 backgroundColor: "#111827",

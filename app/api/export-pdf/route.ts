@@ -565,8 +565,8 @@ export async function GET(request: NextRequest) {
         </div>
       `
       
-      // Determine if PDF should be portrait (inspections) or landscape (selections, assessments)
-      const isPortrait = type === "inspection"
+      // All PDFs use landscape orientation for consistent formatting
+      const isPortrait = false
 
       // Generate PDF with professional settings
       const pdfBuffer = await page.pdf({
