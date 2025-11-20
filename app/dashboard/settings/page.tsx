@@ -7,6 +7,7 @@ import { AssessmentSettings } from "@/components/settings/AssessmentSettings"
 import { UnitSettings } from "@/components/settings/UnitSettings"
 import { ComponentSettings } from "@/components/settings/ComponentSettings"
 import { VendorSettings } from "@/components/settings/VendorSettings"
+import { TemplateSettings } from "@/components/settings/TemplateSettings"
 
 export default function SettingsPage() {
   return (
@@ -46,19 +47,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Templates</CardTitle>
-              <CardDescription>
-                Manage room and component templates
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-500">
-                Template management will be available soon.
-              </p>
-            </CardContent>
-          </Card>
+          <TemplateSettings />
         </TabsContent>
 
         <TabsContent value="inspections" className="space-y-4">

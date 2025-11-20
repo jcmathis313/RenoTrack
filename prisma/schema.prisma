@@ -27,6 +27,7 @@ model Tenant {
   components          Component[]
   catalogItems        CatalogItem[]
   vendors             Vendor[]
+  templates           Template[]
 
   @@index([slug])
 }
@@ -376,4 +377,52 @@ model InspectionComponent {
   inspectionRoom InspectionRoom @relation(fields: [inspectionRoomId], references: [id], onDelete: Cascade)
 
   @@index([inspectionRoomId])
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  templateRooms TemplateRoom[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model TemplateRoom {
+  id              String   @id @default(cuid())
+  templateId      String
+  name            String
+  type            String?
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  template           Template           @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateComponents TemplateComponent[]
+
+  @@index([templateId])
+}
+
+model TemplateComponent {
+  id              String   @id @default(cuid())
+  templateRoomId  String
+  componentType   String
+  componentName   String?
+  condition       String?
+  materialId      String?
+  vendorId        String?
+  quantity        Float    @default(1)
+  unitCost        Float    @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  templateRoom TemplateRoom @relation(fields: [templateRoomId], references: [id], onDelete: Cascade)
+
+  @@index([templateRoomId])
 }

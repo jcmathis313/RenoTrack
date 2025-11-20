@@ -31,10 +31,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { ArrowLeftIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
+import { ArrowLeftIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowPathIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
 import { CatalogItemSelectModal } from "@/components/CatalogItemSelectModal"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ImportTemplateModal } from "@/components/ImportTemplateModal"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -148,6 +149,7 @@ export default function SelectionDetailPage() {
   const [vendors, setVendors] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [addRoomOpen, setAddRoomOpen] = useState(false)
+  const [importTemplateOpen, setImportTemplateOpen] = useState(false)
   const [addComponentOpen, setAddComponentOpen] = useState<string | null>(null)
 
   const [newRoomName, setNewRoomName] = useState("")
@@ -1171,10 +1173,24 @@ export default function SelectionDetailPage() {
           </Select>
         </div>
         {viewMode === "rooms" && (
-          <Button onClick={() => setAddRoomOpen(true)}>
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Add Room
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Add Room
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setAddRoomOpen(true)}>
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Add New Room
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setImportTemplateOpen(true)}>
+                <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
+                Import from Template
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
@@ -2272,6 +2288,14 @@ export default function SelectionDetailPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Import Template Modal */}
+      <ImportTemplateModal
+        open={importTemplateOpen}
+        onOpenChange={setImportTemplateOpen}
+        designProjectId={selectionId}
+        onSuccess={fetchData}
+      />
 
       {/* Add Component Dialog */}
       {addComponentOpen && (
