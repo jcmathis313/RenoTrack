@@ -8,7 +8,6 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 // Increase timeout for PDF generation (Vercel default is 10s, max is 60s for Hobby, 300s for Pro)
 export const maxDuration = 60
-// Note: All TypeScript errors have been fixed in this file
 
 // Configure Chromium for Vercel/serverless (if available)
 // Note: setGraphicsMode may not be available in all versions
@@ -358,7 +357,7 @@ export async function GET(request: NextRequest) {
       if (browser) {
         try {
           await browser.close()
-        } catch (closeError) {
+        } catch (closeError: unknown) {
           console.error("PDF Export: Error closing browser:", closeError)
         }
         browser = null
@@ -380,7 +379,7 @@ export async function GET(request: NextRequest) {
     if (browser) {
       try {
         await browser.close()
-      } catch (closeError) {
+      } catch (closeError: unknown) {
         // Ignore close errors
       }
     }
