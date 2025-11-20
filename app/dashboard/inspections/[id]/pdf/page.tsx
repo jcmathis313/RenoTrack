@@ -204,13 +204,15 @@ export default async function InspectionPDFPage({ params }: PageProps) {
               ? catalogItems.find((item) => item.id === designComponent.materialId) || null
               : null
 
-            // Convert relative image URLs to absolute URLs for PDF rendering
+            // Use image URL as-is (Supabase URLs are already absolute)
+            // Only convert legacy local /uploads/ paths for backward compatibility
             let imageUrl = inspectionComponent.imageUrl
-            if (imageUrl && imageUrl.startsWith("/uploads")) {
-              // Convert relative path to absolute URL
+            if (imageUrl && imageUrl.startsWith("/uploads") && !imageUrl.startsWith("http")) {
+              // Legacy local file path - convert to absolute URL for PDF rendering
               const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"
               imageUrl = `${baseUrl}${imageUrl}`
             }
+            // Supabase Storage URLs are already absolute (https://...), so no conversion needed
 
             return {
               id: inspectionComponent.id,

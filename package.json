@@ -26,6 +26,7 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.0",
     "@sparticuz/chromium": "^141.0.0",
+    "@supabase/supabase-js": "^2.84.0",
     "@tremor/react": "^3.17.2",
     "@types/puppeteer": "^7.0.4",
     "bcryptjs": "^2.4.3",

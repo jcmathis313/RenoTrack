@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { writeFile, mkdir } from "fs/promises"
-import { join } from "path"
-import { existsSync } from "fs"
+import { supabase, STORAGE_BUCKETS } from "@/lib/supabase"
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -18,6 +16,13 @@ export async function POST(
     const user = await getCurrentUser()
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (!supabase) {
+      return NextResponse.json(
+        { error: "File storage not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables." },
+        { status: 500 }
+      )
     }
 
     const resolvedParams = await Promise.resolve(params)
@@ -63,31 +68,45 @@ export async function POST(
       )
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024 // 5MB
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024 // 10MB (matches bucket limit)
     if (file.size > maxSize) {
-      return NextResponse.json({ error: "File size exceeds 5MB limit" }, { status: 400 })
+      return NextResponse.json({ error: "File size exceeds 10MB limit" }, { status: 400 })
     }
 
-    // Generate unique filename
+    // Generate unique filename with tenant prefix for organization
     const timestamp = Date.now()
     const extension = file.name.split(".").pop() || "png"
-    const filename = `${componentId}-${timestamp}.${extension}`
+    const filename = `${user.tenantId}/${componentId}-${timestamp}.${extension}`
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), "public", "uploads", "inspections")
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
+    // Convert File to ArrayBuffer then to Uint8Array for Supabase
+    const bytes = await file.arrayBuffer()
+    const fileBuffer = new Uint8Array(bytes)
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKETS.INSPECTIONS)
+      .upload(filename, fileBuffer, {
+        contentType: file.type,
+        upsert: false, // Don't overwrite existing files
+      })
+
+    if (uploadError) {
+      console.error("Error uploading to Supabase Storage:", uploadError)
+      return NextResponse.json(
+        { error: "Failed to upload image to storage", details: uploadError.message },
+        { status: 500 }
+      )
     }
 
-    // Save file
-    const filePath = join(uploadsDir, filename)
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
+    // Get public URL for the uploaded file
+    const { data: urlData } = supabase.storage
+      .from(STORAGE_BUCKETS.INSPECTIONS)
+      .getPublicUrl(filename)
+
+    const imageUrl = urlData.publicUrl
 
     // Update component with image URL
-    const imageUrl = `/uploads/inspections/${filename}`
     await prisma.inspectionComponent.update({
       where: { id: componentId },
       data: { imageUrl },
