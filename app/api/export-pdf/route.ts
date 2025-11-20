@@ -423,6 +423,13 @@ export async function GET(request: NextRequest) {
                 return
               }
               
+              // Skip pills and group headers - they should have white text
+              if (el.classList.contains('status-pill') || 
+                  el.classList.contains('upgrade-badge') || 
+                  el.classList.contains('pdf-group-header')) {
+                return
+              }
+              
               const computedStyle = window.getComputedStyle(el)
               const color = computedStyle.color
               const visibility = computedStyle.visibility
@@ -477,6 +484,13 @@ export async function GET(request: NextRequest) {
           while (textNode = walker.nextNode()) {
             const parent = textNode.parentElement
             if (parent) {
+              // Skip pills and group headers - they should have white text
+              if (parent.classList.contains('status-pill') || 
+                  parent.classList.contains('upgrade-badge') || 
+                  parent.classList.contains('pdf-group-header')) {
+                continue
+              }
+              
               const style = window.getComputedStyle(parent)
               if (style.color === 'rgba(0, 0, 0, 0)' || 
                   style.color === 'transparent' || 

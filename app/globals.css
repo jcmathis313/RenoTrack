@@ -100,19 +100,26 @@ table.table-fixed th {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   }
   
-  /* Ensure all text is visible */
-  .pdf-container * {
+  /* Ensure all text is visible, but exclude pills and group headers */
+  .pdf-container *:not(.status-pill):not(.upgrade-badge):not(.pdf-group-header) {
     color: #111827 !important;
   }
   
-  .pdf-container td,
-  .pdf-container th,
-  .pdf-container p,
-  .pdf-container div,
-  .pdf-container span {
+  .pdf-container td:not(.status-pill):not(.upgrade-badge):not(.pdf-group-header),
+  .pdf-container th:not(.status-pill):not(.upgrade-badge):not(.pdf-group-header),
+  .pdf-container p:not(.status-pill):not(.upgrade-badge):not(.pdf-group-header),
+  .pdf-container div:not(.status-pill):not(.upgrade-badge):not(.pdf-group-header),
+  .pdf-container span:not(.status-pill):not(.upgrade-badge):not(.pdf-group-header) {
     color: #111827 !important;
     visibility: visible !important;
     opacity: 1 !important;
+  }
+  
+  /* Ensure pills and group headers keep their white text */
+  .pdf-container .status-pill,
+  .pdf-container .upgrade-badge,
+  .pdf-container .pdf-group-header {
+    color: white !important;
   }
 
   .no-print {
