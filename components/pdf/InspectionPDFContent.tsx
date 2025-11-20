@@ -1,5 +1,7 @@
 "use client"
 
+import React from "react"
+
 interface ComponentStatus {
   id: string
   name: string
@@ -13,6 +15,31 @@ interface TenantSettings {
   themeColor?: string | null
 }
 
+interface CatalogItem {
+  id: string
+  description: string | null
+  modelNumber: string | null
+  manufacturer: string | null
+  finish: string | null
+  color: string | null
+  imageUrl: string | null
+  category?: {
+    id: string
+    name: string
+  } | null
+}
+
+interface DesignComponent {
+  condition: string | null
+  materialId: string | null
+  catalogItem: CatalogItem | null
+  quantity: number
+  unitCost: number
+  totalCost: number
+  residentUpgrade: boolean | null
+  notes: string | null
+}
+
 interface InspectionComponent {
   id: string
   componentType: string
@@ -20,6 +47,7 @@ interface InspectionComponent {
   status: string | null // "pass" | "fail" | null
   notes: string | null
   imageUrl: string | null
+  designComponent: DesignComponent | null
 }
 
 interface InspectionRoom {
@@ -65,7 +93,7 @@ const getStatusColor = (statusName: string | null, statuses: ComponentStatus[]):
   if (!statusName) return "#6b7280"
   const status = statuses.find((s) => s.name === statusName)
   if (!status) return "#6b7280"
-  
+
   const colorMap: Record<string, string> = {
     green: "#10b981",
     blue: "#3b82f6",
@@ -74,7 +102,7 @@ const getStatusColor = (statusName: string | null, statuses: ComponentStatus[]):
     gray: "#6b7280",
     yellow: "#eab308",
   }
-  
+
   return colorMap[status.color || "gray"] || "#6b7280"
 }
 
@@ -91,6 +119,8 @@ export default function InspectionPDFContent({
 }: InspectionPDFContentProps) {
   const companyName = tenantSettings?.companyName || "Your Company"
   const businessAddress = tenantSettings?.businessAddress || ""
+  const accentColor = "#111827" // Black for monochrome theme
+
   const generatedAt = new Date().toLocaleString("en-US", {
     year: "numeric",
     month: "long",
@@ -99,62 +129,150 @@ export default function InspectionPDFContent({
     minute: "2-digit",
   })
 
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return "—"
+    return new Date(dateString).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+  }
+
   return (
     <div
-      className="pdf-container"
+      className="pdf-container pdf-portrait"
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         color: "#1f2937",
-        lineHeight: 1.6,
+        lineHeight: 1.35,
+        fontSize: "8pt",
       }}
     >
       {/* PDF Header */}
       <div className="pdf-header">
-        <div className="pdf-title">Inspection Report</div>
-        <div className="pdf-subtitle">{inspection.designProject.name}</div>
-        <div className="pdf-meta">
+        <div className="pdf-header-main">
           <div>
-            <strong>Community:</strong> {inspection.designProject.unit.building.community.name}
-          </div>
-          <div>
-            <strong>Building:</strong> {inspection.designProject.unit.building.name}
-          </div>
-          <div>
-            <strong>Unit:</strong> {inspection.designProject.unit.number}
-          </div>
-          <div>
-            <strong>Inspection Date:</strong> {new Date(inspection.inspectedAt).toLocaleDateString()}
-          </div>
-          <div>
-            <strong>Inspected By:</strong> {inspection.inspectedBy || "N/A"}
-          </div>
-          <div>
-            <strong>Status:</strong> {inspection.status || "Draft"}
-          </div>
-        </div>
-      </div>
-
-      {/* Company Info */}
-      <div className="pdf-section">
-        <div className="text-muted" style={{ fontSize: "0.875rem" }}>
-          <div>{companyName}</div>
-          {businessAddress && <div>{businessAddress}</div>}
-          <div style={{ marginTop: "0.5rem" }}>Generated: {generatedAt}</div>
-        </div>
-      </div>
-
-      {/* Rooms and Components */}
-      {inspection.inspectionRooms.map((room, roomIndex) => (
-        <div key={room.id} className="pdf-section">
-          <div className="room-card">
-            <div className="room-header">
-              Room {roomIndex + 1}: {room.name}
+            <div className="pdf-eyebrow" style={{ color: accentColor }}>
+              Inspection Report
             </div>
+            <div className="pdf-title">
+              {inspection.designProject?.unit?.building?.community?.name || "—"} - {inspection.designProject?.unit?.building?.name || "—"} - Unit {inspection.designProject?.unit?.number || "—"}
+            </div>
+            <div className="pdf-subtitle">Generated {generatedAt}</div>
+          </div>
+          {inspection.designProject?.unit?.building?.community?.logoUrl && (
+            <div className="pdf-logo-wrap">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={inspection.designProject.unit.building.community.logoUrl}
+                alt={`${inspection.designProject.unit.building.community.name || "Community"} logo`}
+                className="pdf-logo-image"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="pdf-meta-grid">
+          <div>
+            <div className="pdf-meta-label">Community</div>
+            <div className="pdf-meta-value">{inspection.designProject?.unit?.building?.community?.name || "—"}</div>
+          </div>
+          <div>
+            <div className="pdf-meta-label">Building</div>
+            <div className="pdf-meta-value">{inspection.designProject?.unit?.building?.name || "—"}</div>
+          </div>
+          <div>
+            <div className="pdf-meta-label">Unit</div>
+            <div className="pdf-meta-value">{inspection.designProject?.unit?.number || "—"}</div>
+          </div>
+          <div>
+            <div className="pdf-meta-label">Inspection Date</div>
+            <div className="pdf-meta-value">{formatDate(inspection.inspectedAt)}</div>
+          </div>
+          <div>
+            <div className="pdf-meta-label">Inspected By</div>
+            <div className="pdf-meta-value">{inspection.inspectedBy || "—"}</div>
+          </div>
+          <div>
+            <div className="pdf-meta-label">Status</div>
+            <div className="pdf-meta-value">{inspection.status || "—"}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Executive Summary */}
+      <div className="pdf-section">
+        <div className="pdf-info-card">
+          <div className="pdf-info-column">
+            <div className="pdf-info-heading">Executive Summary</div>
+            <div className="pdf-stats-grid">
+              <div className="pdf-stat-card">
+                <div className="pdf-stat-label">Rooms</div>
+                <div className="pdf-stat-value">{inspection.inspectionRooms.length}</div>
+                <div className="pdf-stat-subtext">Included in this report</div>
+              </div>
+              <div className="pdf-stat-card">
+                <div className="pdf-stat-label">Items Inspected</div>
+                <div className="pdf-stat-value">
+                  {inspection.inspectionRooms.reduce(
+                    (sum, room) => sum + room.inspectionComponents.length,
+                    0
+                  )}
+                </div>
+                <div className="pdf-stat-subtext">Across all rooms</div>
+              </div>
+              <div className="pdf-stat-card">
+                <div className="pdf-stat-label">Passed</div>
+                <div className="pdf-stat-value text-green-600">
+                  {inspection.inspectionRooms.reduce(
+                    (sum, room) =>
+                      sum + room.inspectionComponents.filter((c) => c.status === "pass").length,
+                    0
+                  )}
+                </div>
+                <div className="pdf-stat-subtext">Items passed inspection</div>
+              </div>
+              <div className="pdf-stat-card">
+                <div className="pdf-stat-label">Failed</div>
+                <div className="pdf-stat-value text-red-600">
+                  {inspection.inspectionRooms.reduce(
+                    (sum, room) =>
+                      sum + room.inspectionComponents.filter((c) => c.status === "fail").length,
+                    0
+                  )}
+                </div>
+                <div className="pdf-stat-subtext">Items failed inspection</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Rooms and Components - separate table for each room */}
+      {inspection.inspectionRooms && inspection.inspectionRooms.length > 0 ? (
+        inspection.inspectionRooms.map((room) => (
+        <div key={room.id} className="pdf-section">
+          <div className="pdf-group-table-wrapper">
+            {/* Room Header */}
+            <div
+              className="pdf-group-header"
+              style={{
+                backgroundColor: "#111827",
+                background: "#111827",
+                color: "white",
+                display: "block",
+              }}
+            >
+              {room.name.toUpperCase()}
+            </div>
+            {/* Separate table for this room */}
             {room.inspectionComponents.length > 0 ? (
-              <table className="component-table">
+              <table className="component-table spec-table">
                 <thead>
                   <tr>
-                    <th>Component / Type</th>
+                    <th>Component</th>
+                    <th>Work Description</th>
+                    <th>Image</th>
                     <th>Status</th>
                     <th>Notes</th>
                   </tr>
@@ -163,20 +281,91 @@ export default function InspectionPDFContent({
                   {room.inspectionComponents.map((component) => (
                     <tr key={component.id}>
                       <td>
-                        <div>{component.componentType}</div>
-                        {component.componentName && (
-                          <div className="text-muted" style={{ fontSize: "0.75rem" }}>
-                            {component.componentName}
+                        <div className="component-type-title">
+                          {component.componentName || component.componentType}
+                        </div>
+                        {component.designComponent?.condition && (
+                          <span
+                            className="status-pill"
+                            style={{
+                              backgroundColor: getStatusColor(
+                                component.designComponent.condition,
+                                componentStatuses
+                              ),
+                              color: "white",
+                              background: getStatusColor(
+                                component.designComponent.condition,
+                                componentStatuses
+                              ),
+                            } as React.CSSProperties}
+                          >
+                            {component.designComponent.condition}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {component.designComponent?.catalogItem ? (
+                          <div className="component-material">
+                            <div className="component-material-title">
+                              {component.designComponent.catalogItem.manufacturer ||
+                                component.designComponent.catalogItem.description ||
+                                "Catalog Item"}
+                            </div>
+                            {(() => {
+                              const materialMeta = [
+                                component.designComponent.catalogItem?.modelNumber,
+                                component.designComponent.catalogItem?.finish,
+                                component.designComponent.catalogItem?.color,
+                              ]
+                                .filter(Boolean)
+                                .join(" • ")
+                              if (!materialMeta) return null
+                              return (
+                                <div className="component-material-meta">{materialMeta}</div>
+                              )
+                            })()}
+                            {component.designComponent.catalogItem.description && (
+                              <div className="component-description">
+                                {component.designComponent.catalogItem.description}
+                              </div>
+                            )}
                           </div>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        {component.imageUrl ? (
+                          <div className="component-image-wrap">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={component.imageUrl}
+                              alt={component.componentName || "Inspection image"}
+                              className="component-image"
+                            />
+                          </div>
+                        ) : component.designComponent?.catalogItem?.imageUrl ? (
+                          <div className="component-image-wrap">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={component.designComponent.catalogItem.imageUrl}
+                              alt={component.componentName || "Catalog item image"}
+                              className="component-image"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-muted">—</span>
                         )}
                       </td>
                       <td>
                         {component.status ? (
                           <span
-                            className="status-badge"
+                            className="status-pill"
                             style={{
                               backgroundColor: getInspectionStatusColor(component.status),
-                            }}
+                              color: "white",
+                              background: getInspectionStatusColor(component.status),
+                            } as React.CSSProperties}
                           >
                             {component.status === "pass" ? "Pass" : "Fail"}
                           </span>
@@ -185,75 +374,31 @@ export default function InspectionPDFContent({
                         )}
                       </td>
                       <td>
-                        {component.notes ? (
-                          <div style={{ fontSize: "0.75rem" }}>{component.notes}</div>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
+                        <div className="component-notes-text">{component.notes || "—"}</div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <div className="text-muted">No components inspected in this room.</div>
+              <div className="text-muted">No items inspected in this room.</div>
             )}
           </div>
         </div>
-      ))}
-
-      {/* Summary */}
-      <div className="summary-box">
-        <div className="pdf-section-title">Summary</div>
-        <div className="summary-row">
-          <span>Total Rooms:</span>
-          <span>{inspection.inspectionRooms.length}</span>
+        ))
+      ) : (
+        <div className="pdf-section">
+          <div className="text-muted">No rooms found in this inspection.</div>
         </div>
-        <div className="summary-row">
-          <span>Total Components:</span>
-          <span>
-            {inspection.inspectionRooms.reduce(
-              (sum, room) => sum + room.inspectionComponents.length,
-              0
-            )}
-          </span>
-        </div>
-        <div className="summary-row">
-          <span>Passed:</span>
-          <span>
-            {inspection.inspectionRooms.reduce(
-              (sum, room) => sum + room.inspectionComponents.filter((c) => c.status === "pass").length,
-              0
-            )}
-          </span>
-        </div>
-        <div className="summary-row">
-          <span>Failed:</span>
-          <span>
-            {inspection.inspectionRooms.reduce(
-              (sum, room) => sum + room.inspectionComponents.filter((c) => c.status === "fail").length,
-              0
-            )}
-          </span>
-        </div>
-      </div>
+      )}
 
       {/* Footer */}
-      <div
-        className="print-footer"
-        style={{
-          marginTop: "3rem",
-          paddingTop: "1rem",
-          borderTop: "1px solid #e5e7eb",
-          fontSize: "0.75rem",
-          color: "#6b7280",
-          textAlign: "center",
-        }}
-      >
+      <div className="print-footer">
         <div>{companyName}</div>
         <div>Generated on {generatedAt}</div>
       </div>
     </div>
   )
 }
+
 

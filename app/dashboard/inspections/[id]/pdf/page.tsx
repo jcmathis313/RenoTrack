@@ -42,6 +42,18 @@ async function getInspectionData(inspectionId: string, tenantId: string) {
               },
             },
           },
+          designRooms: {
+            include: {
+              designComponents: {
+                orderBy: {
+                  createdAt: "asc",
+                },
+              },
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
         },
       },
       inspectionRooms: {
@@ -83,8 +95,22 @@ export default async function InspectionPDFPage({ params }: PageProps) {
       redirect("/login")
     }
 
-    const inspection = await getInspectionData(params.id, user.tenantId)
+    // Ensure params is resolved (for Next.js 15+ compatibility)
+    const resolvedParams = params instanceof Promise ? await params : params
+    const inspectionId = resolvedParams.id
+
+    if (!inspectionId) {
+      return (
+        <div style={{ padding: "2rem", textAlign: "center" }}>
+          <h1>Invalid Inspection ID</h1>
+          <p>The inspection ID is missing or invalid.</p>
+        </div>
+      )
+    }
+
+    const inspection = await getInspectionData(inspectionId, user.tenantId)
     if (!inspection) {
+      console.error("InspectionPDFPage: Inspection not found", { inspectionId, tenantId: user.tenantId })
       return (
         <div style={{ padding: "2rem", textAlign: "center" }}>
           <h1>Inspection not found</h1>
@@ -93,14 +119,126 @@ export default async function InspectionPDFPage({ params }: PageProps) {
       )
     }
 
+    if (!inspection.designProject) {
+      console.error("InspectionPDFPage: Design project not found for inspection", { inspectionId })
+      return (
+        <div style={{ padding: "2rem", textAlign: "center" }}>
+          <h1>Design Project Missing</h1>
+          <p>This inspection is missing its associated design project.</p>
+        </div>
+      )
+    }
+
+    // Match inspection components with design components to get catalog items
+    const materialIds = inspection.designProject?.designRooms
+      ?.flatMap((room) => room.designComponents || [])
+      ?.map((comp) => comp.materialId)
+      ?.filter((id): id is string => id !== null) || []
+
+    const catalogItems = materialIds.length > 0
+      ? await prisma.catalogItem.findMany({
+          where: {
+            id: { in: materialIds },
+            tenantId: user.tenantId,
+          },
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            component: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        })
+      : []
+
+    // Enrich inspection components with catalog item details
+    // Serialize all data to ensure it's JSON-serializable for client component
     const inspectionForPdf = {
-      ...inspection,
+      id: inspection.id,
+      inspectedBy: inspection.inspectedBy,
       inspectedAt: inspection.inspectedAt.toISOString(),
-      designProject: inspection.designProject,
-      inspectionRooms: inspection.inspectionRooms.map((room) => ({
-        ...room,
-        inspectionComponents: room.inspectionComponents,
-      })),
+      status: inspection.status,
+      designProject: {
+        id: inspection.designProject.id,
+        name: inspection.designProject.name,
+        unit: {
+          id: inspection.designProject.unit.id,
+          number: inspection.designProject.unit.number,
+          building: {
+            name: inspection.designProject.unit.building.name,
+            community: {
+              id: inspection.designProject.unit.building.community.id,
+              name: inspection.designProject.unit.building.community.name,
+              logoUrl: inspection.designProject.unit.building.community.logoUrl,
+            },
+          },
+        },
+      },
+      inspectionRooms: inspection.inspectionRooms.map((inspectionRoom) => {
+        const designRoom = inspection.designProject?.designRooms?.find(
+          (dr) => dr.name === inspectionRoom.name
+        )
+
+        return {
+          id: inspectionRoom.id,
+          name: inspectionRoom.name,
+          type: inspectionRoom.type,
+          status: inspectionRoom.status,
+          order: inspectionRoom.order,
+          inspectionComponents: inspectionRoom.inspectionComponents.map((inspectionComponent) => {
+            const designComponent = designRoom?.designComponents?.find(
+              (dc) =>
+                dc.componentType === inspectionComponent.componentType &&
+                (dc.componentName === inspectionComponent.componentName ||
+                  (!dc.componentName && !inspectionComponent.componentName))
+            )
+
+            const catalogItem = designComponent?.materialId
+              ? catalogItems.find((item) => item.id === designComponent.materialId) || null
+              : null
+
+            return {
+              id: inspectionComponent.id,
+              componentType: inspectionComponent.componentType,
+              componentName: inspectionComponent.componentName,
+              status: inspectionComponent.status,
+              notes: inspectionComponent.notes,
+              imageUrl: inspectionComponent.imageUrl,
+              designComponent: designComponent
+                ? {
+                    condition: designComponent.condition || null,
+                    materialId: designComponent.materialId || null,
+                    catalogItem: catalogItem
+                      ? {
+                          id: catalogItem.id,
+                          description: catalogItem.description,
+                          modelNumber: catalogItem.modelNumber,
+                          manufacturer: catalogItem.manufacturer,
+                          finish: catalogItem.finish,
+                          color: catalogItem.color,
+                          imageUrl: catalogItem.imageUrl,
+                          category: catalogItem.category || null,
+                          component: catalogItem.component || null,
+                        }
+                      : null,
+                    quantity: designComponent.quantity || 0,
+                    unitCost: designComponent.unitCost || 0,
+                    totalCost: designComponent.totalCost || 0,
+                    residentUpgrade: designComponent.residentUpgrade || null,
+                    notes: designComponent.notes || null,
+                  }
+                : null,
+            }
+          }),
+        }
+      }),
     }
 
     const tenantSettings = await getTenantSettings(user.tenantId)
@@ -118,10 +256,21 @@ export default async function InspectionPDFPage({ params }: PageProps) {
     )
   } catch (error: any) {
     console.error("Error rendering Inspection PDF page:", error)
+    console.error("Error stack:", error?.stack)
+    console.error("Error details:", {
+      message: error?.message,
+      name: error?.name,
+      code: error?.code,
+    })
     return (
       <div style={{ padding: "2rem", textAlign: "center" }}>
         <h1>Error Loading PDF</h1>
         <p>{error?.message || "An error occurred while loading the PDF content."}</p>
+        {process.env.NODE_ENV === "development" && error?.stack && (
+          <pre style={{ marginTop: "1rem", textAlign: "left", fontSize: "0.75rem" }}>
+            {error.stack}
+          </pre>
+        )}
       </div>
     )
   }

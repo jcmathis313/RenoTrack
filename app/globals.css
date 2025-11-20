@@ -401,6 +401,27 @@ table.table-fixed th {
   width: 10%;
 }
 
+/* Inspection table column widths (5 columns: Component, Work Description, Image, Status, Notes) */
+.pdf-portrait .spec-table th:nth-child(1) {
+  width: 15%; /* Component */
+}
+
+.pdf-portrait .spec-table th:nth-child(2) {
+  width: 40%; /* Work Description */
+}
+
+.pdf-portrait .spec-table th:nth-child(3) {
+  width: 8%; /* Image */
+}
+
+.pdf-portrait .spec-table th:nth-child(4) {
+  width: 12%; /* Status */
+}
+
+.pdf-portrait .spec-table th:nth-child(5) {
+  width: 25%; /* Notes */
+}
+
 .quantity-cell {
   text-align: center;
   width: 6%;

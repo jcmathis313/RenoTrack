@@ -116,44 +116,82 @@ export async function GET(request: NextRequest) {
         // Parse cookies properly - handle NextAuth session cookie
         const cookiePairs = cookieHeader.split(";").map((c) => c.trim())
         const urlObj = new URL(baseUrl)
-        const domain = urlObj.hostname === "localhost" || urlObj.hostname === "127.0.0.1" 
-          ? urlObj.hostname // Keep localhost as-is for cookie domain
-          : urlObj.hostname.replace(":3000", "") // Remove port for other domains
+        
+        // For localhost, omit domain (Puppeteer requires this)
+        // For other domains, use the hostname without port
+        const isLocalhost = urlObj.hostname === "localhost" || urlObj.hostname === "127.0.0.1"
         
         const cookieArray = cookiePairs
           .map((cookie) => {
             const [name, ...valueParts] = cookie.split("=")
             const value = valueParts.join("=") // Handle values that contain =
             if (!name || !value) return null
-            return {
+            
+            const cookieObj: {
+              name: string
+              value: string
+              path: string
+              httpOnly: boolean
+              secure: boolean
+              sameSite: "Lax" | "None" | "Strict"
+              domain?: string
+            } = {
               name: name.trim(),
               value: decodeURIComponent(value),
-              domain: domain,
               path: "/",
               httpOnly: false,
               secure: baseUrl.startsWith("https"),
-              sameSite: "Lax" as const,
+              sameSite: "Lax",
             }
+            
+            // Only set domain for non-localhost
+            if (!isLocalhost) {
+              cookieObj.domain = urlObj.hostname.replace(":3000", "").replace(":3001", "")
+            }
+            
+            return cookieObj
           })
           .filter((c): c is NonNullable<typeof c> => c !== null)
 
         if (cookieArray.length > 0) {
-          await page.setCookie(...cookieArray)
-          console.log(`PDF Export: Set ${cookieArray.length} cookies for domain: ${domain}`)
+          // Set cookies one by one for better error handling
+          for (const cookie of cookieArray) {
+            try {
+              await page.setCookie(cookie)
+            } catch (cookieError: any) {
+              console.warn(`PDF Export: Failed to set cookie ${cookie.name}:`, cookieError.message)
+            }
+          }
+          console.log(`PDF Export: Set ${cookieArray.length} cookies${isLocalhost ? " (localhost, no domain)" : ` for domain: ${urlObj.hostname}`}`)
         }
       } else {
         console.warn("PDF Export: No cookies found in request")
       }
 
       console.log("PDF Export: Navigating to PDF URL...")
-      await page.goto(pdfUrl, {
+      const navigationResponse = await page.goto(pdfUrl, {
         waitUntil: "networkidle0",
         timeout: 30000,
       })
 
+      if (!navigationResponse) {
+        throw new Error("Navigation failed - no response received")
+      }
+
+      const finalUrl = page.url()
+      console.log("PDF Export: Navigation complete. Final URL:", finalUrl)
+
+      // Check if we were redirected to login
+      if (finalUrl.includes("/login")) {
+        throw new Error("Authentication failed - redirected to login page. Check cookie configuration.")
+      }
+
       console.log("PDF Export: Page loaded, waiting for PDF container...")
       // Wait for content to be ready
-      await page.waitForSelector(".pdf-container", { timeout: 15000 })
+      await page.waitForSelector(".pdf-container", { timeout: 15000 }).catch((selectorError) => {
+        console.error("PDF Export: Could not find .pdf-container selector")
+        throw new Error(`PDF content not found: ${selectorError.message}`)
+      })
 
       // Wait for all images to load
       await page.evaluate(() => {
@@ -195,10 +233,13 @@ export async function GET(request: NextRequest) {
         </div>
       `
       
+      // Determine if PDF should be portrait (inspections) or landscape (selections, assessments)
+      const isPortrait = type === "inspection"
+
       // Generate PDF with professional settings
       const pdfBuffer = await page.pdf({
         format: "Letter",
-        landscape: true,
+        landscape: !isPortrait, // Portrait for inspections, landscape for others
         margin: {
           top: "0.4in",
           right: "0.4in",
@@ -228,6 +269,21 @@ export async function GET(request: NextRequest) {
     } catch (pageError: any) {
       console.error("PDF Export: Error during PDF generation:", pageError)
       console.error("PDF Export: Error stack:", pageError?.stack)
+      console.error("PDF Export: Error details:", {
+        message: pageError?.message,
+        name: pageError?.name,
+        code: pageError?.code,
+      })
+      
+      // Try to get more details from the page if possible
+      try {
+        const pageContent = await page.content().catch(() => null)
+        if (pageContent) {
+          console.error("PDF Export: Page content (first 500 chars):", pageContent.substring(0, 500))
+        }
+      } catch (contentError) {
+        console.error("PDF Export: Could not get page content:", contentError)
+      }
       
       if (browser) {
         try {
@@ -238,7 +294,14 @@ export async function GET(request: NextRequest) {
         browser = null
       }
       
-      throw new Error(`PDF generation failed: ${pageError?.message || "Unknown error"}`)
+      return NextResponse.json(
+        {
+          error: "Failed to generate PDF",
+          details: pageError?.message || "Unknown error",
+          stack: process.env.NODE_ENV === "development" ? pageError?.stack : undefined,
+        },
+        { status: 500 }
+      )
     }
   } catch (error: any) {
     console.error("PDF Export: Fatal error:", error)
