@@ -294,6 +294,13 @@ export function TemplateSettings() {
                               <Button
                                 size="sm"
                                 variant="ghost"
+                                onClick={() => window.location.href = `/dashboard/settings/templates/${template.id}`}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
                                 onClick={() => handleEditTemplateStart(template)}
                               >
                                 <PencilIcon className="h-4 w-4" />
