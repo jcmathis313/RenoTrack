@@ -70,7 +70,10 @@ export async function GET(request: NextRequest) {
       if (isDev) {
         // Development: Use local Puppeteer installation
         const puppeteerDev = await import("puppeteer")
-        browser = await puppeteerDev.default.launch({
+        console.log("PDF Export: Launching browser in development mode...")
+        
+        // Try to launch with executable path if available, otherwise let puppeteer find it
+        const launchOptions: any = {
           headless: true,
           args: [
             "--no-sandbox",
@@ -78,8 +81,40 @@ export async function GET(request: NextRequest) {
             "--disable-dev-shm-usage",
             "--disable-accelerated-2d-canvas",
             "--disable-gpu",
+            "--disable-software-rasterizer",
+            "--disable-extensions",
           ],
-        })
+          timeout: 60000, // Increase timeout to 60 seconds
+        }
+        
+        // Try to use system Chrome if available (faster than downloading Chromium)
+        const { execSync } = await import("child_process")
+        try {
+          // Check for Chrome in common locations on macOS
+          const chromePaths = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+          ]
+          
+          for (const chromePath of chromePaths) {
+            try {
+              const fs = await import("fs")
+              if (fs.existsSync(chromePath)) {
+                launchOptions.executablePath = chromePath
+                console.log(`PDF Export: Using Chrome at ${chromePath}`)
+                break
+              }
+            } catch {
+              // Continue to next path
+            }
+          }
+        } catch {
+          // If we can't find system Chrome, puppeteer will download Chromium
+          console.log("PDF Export: Using Puppeteer's bundled Chromium")
+        }
+        
+        browser = await puppeteerDev.default.launch(launchOptions)
+        console.log("PDF Export: Browser launched successfully in development")
       } else {
         // Production (Vercel): Use @sparticuz/chromium
         browser = await puppeteer.launch({
