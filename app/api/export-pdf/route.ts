@@ -65,7 +65,9 @@ export async function GET(request: NextRequest) {
 
     // Launch Puppeteer with Chromium optimized for serverless
     try {
-      const isDev = process.env.NODE_ENV === "development" || process.env.VERCEL !== "1"
+      // Determine if we're in development (localhost) or production-like (Vercel)
+      // VERCEL=1 means we're on Vercel (staging or production)
+      const isDev = process.env.NODE_ENV === "development" && process.env.VERCEL !== "1"
       
       if (isDev) {
         // Development: Use local Puppeteer installation
