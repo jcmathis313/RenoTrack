@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
-import puppeteer from "puppeteer"
+import puppeteer from "puppeteer-core"
+import chromium from "@sparticuz/chromium"
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+// Configure Chromium for Vercel/serverless
+chromium.setGraphicsMode(false)
 
 export async function GET(request: NextRequest) {
   let browser: any = null
@@ -56,18 +60,39 @@ export async function GET(request: NextRequest) {
     const pdfUrl = `${baseUrl}${pdfRoute}`
     console.log("PDF Export: Generating PDF for URL:", pdfUrl)
 
-    // Launch Puppeteer
+    // Launch Puppeteer with Chromium optimized for serverless
     try {
-      browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-accelerated-2d-canvas",
-          "--disable-gpu",
-        ],
-      })
+      const isDev = process.env.NODE_ENV === "development" || process.env.VERCEL !== "1"
+      
+      if (isDev) {
+        // Development: Use local Puppeteer installation
+        const puppeteerDev = await import("puppeteer")
+        browser = await puppeteerDev.default.launch({
+          headless: true,
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-accelerated-2d-canvas",
+            "--disable-gpu",
+          ],
+        })
+      } else {
+        // Production (Vercel): Use @sparticuz/chromium
+        browser = await puppeteer.launch({
+          args: [
+            ...chromium.args,
+            "--hide-scrollbars",
+            "--disable-web-security",
+            "--disable-gpu",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+          ],
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
+        })
+      }
       console.log("PDF Export: Browser launched successfully")
     } catch (launchError: any) {
       console.error("PDF Export: Failed to launch browser:", launchError)
