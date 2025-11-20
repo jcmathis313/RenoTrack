@@ -239,9 +239,9 @@ export async function GET(request: NextRequest) {
 
       console.log("PDF Export: Page loaded, waiting for PDF container...")
       // Wait for content to be ready
-      await page.waitForSelector(".pdf-container", { timeout: 15000 }).catch((selectorError) => {
+      await page.waitForSelector(".pdf-container", { timeout: 15000 }).catch((selectorError: any) => {
         console.error("PDF Export: Could not find .pdf-container selector")
-        throw new Error(`PDF content not found: ${selectorError.message}`)
+        throw new Error(`PDF content not found: ${selectorError?.message || "Unknown error"}`)
       })
 
       // Wait for all images to load - with better error handling
