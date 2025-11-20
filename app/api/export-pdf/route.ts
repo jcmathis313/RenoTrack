@@ -401,49 +401,102 @@ export async function GET(request: NextRequest) {
       // Wait for CSS to be fully applied and fonts to load
       console.log("PDF Export: Waiting for CSS and fonts to load...")
       try {
-        // Wait for all fonts to be loaded
+        // Wait for all fonts to be loaded and ensure text is visible
         await page.evaluate(async () => {
-          await document.fonts.ready
+          // Wait for fonts to load (including Google Fonts from CDN)
+          if (document.fonts && document.fonts.ready) {
+            await document.fonts.ready
+          }
           
-          // Wait for any external font stylesheets to load
-          const styleSheets = Array.from(document.styleSheets)
-          await Promise.all(
-            styleSheets.map((sheet) => {
-              try {
-                // Access the rules to ensure stylesheet is loaded
-                const rules = sheet.cssRules || sheet.rules
-                return Promise.resolve()
-              } catch (e) {
-                // Cross-origin stylesheet, skip
-                return Promise.resolve()
-              }
-            })
-          )
+          // Wait additional time for font files to download from CDN
+          await new Promise(resolve => setTimeout(resolve, 3000))
           
-          // Ensure all text elements are visible and have proper color
-          const allTextElements = document.querySelectorAll('p, div, span, td, th, h1, h2, h3, h4, h5, h6, label, button')
-          allTextElements.forEach((el) => {
+          // Find all text-containing elements in the PDF container
+          const pdfContainer = document.querySelector('.pdf-container')
+          if (!pdfContainer) {
+            console.error('PDF Export: PDF container not found!')
+            return
+          }
+          
+          // Get all elements that might contain text
+          const allElements = pdfContainer.querySelectorAll('*')
+          
+          allElements.forEach((el) => {
             if (el instanceof HTMLElement) {
+              // Skip if element has no text content
+              if (!el.textContent || el.textContent.trim().length === 0) {
+                return
+              }
+              
               const computedStyle = window.getComputedStyle(el)
               const color = computedStyle.color
               const visibility = computedStyle.visibility
+              const display = computedStyle.display
+              const opacity = computedStyle.opacity
               
-              // If text is invisible or transparent, make it visible
-              if (color === 'rgba(0, 0, 0, 0)' || color === 'transparent' || visibility === 'hidden') {
-                el.style.color = '#000000'
-                el.style.visibility = 'visible'
+              // Force text to be visible with explicit black color
+              // Check if text might be invisible
+              if (color === 'rgba(0, 0, 0, 0)' || 
+                  color === 'transparent' || 
+                  color === 'rgb(255, 255, 255)' ||
+                  color === 'rgba(255, 255, 255, 1)' ||
+                  visibility === 'hidden' ||
+                  display === 'none' ||
+                  opacity === '0') {
+                
+                // Set explicit black color for text
+                el.style.color = '#111827 !important'
+                el.style.visibility = 'visible !important'
+                el.style.opacity = '1 !important'
+                
+                if (display === 'none') {
+                  // Don't change display if it's a table element
+                  if (el.tagName !== 'TABLE' && el.tagName !== 'TD' && el.tagName !== 'TH' && el.tagName !== 'TR') {
+                    el.style.display = 'block'
+                  }
+                }
               }
               
-              // Ensure text is not hidden by opacity
-              if (computedStyle.opacity === '0') {
-                el.style.opacity = '1'
+              // Ensure font family has fallbacks
+              const currentFont = computedStyle.fontFamily
+              if (currentFont && !currentFont.includes('sans-serif')) {
+                el.style.fontFamily = `"${currentFont.split(',')[0].replace(/['"]/g, '')}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`
+              }
+              
+              // Force minimum font size to ensure text is visible
+              const fontSize = computedStyle.fontSize
+              if (fontSize && parseFloat(fontSize) < 6) {
+                el.style.fontSize = '8px'
               }
             }
           })
+          
+          // Also ensure all text nodes are visible
+          const walker = document.createTreeWalker(
+            pdfContainer,
+            NodeFilter.SHOW_TEXT,
+            null
+          )
+          
+          let textNode
+          while (textNode = walker.nextNode()) {
+            const parent = textNode.parentElement
+            if (parent) {
+              const style = window.getComputedStyle(parent)
+              if (style.color === 'rgba(0, 0, 0, 0)' || 
+                  style.color === 'transparent' || 
+                  style.visibility === 'hidden' ||
+                  style.opacity === '0') {
+                parent.style.color = '#111827'
+                parent.style.visibility = 'visible'
+                parent.style.opacity = '1'
+              }
+            }
+          }
         })
-        console.log("PDF Export: Fonts and CSS loaded successfully")
+        console.log("PDF Export: Fonts and CSS loaded, text visibility ensured")
       } catch (fontError: unknown) {
-        console.warn("PDF Export: Font loading check failed, but continuing:", fontError)
+        console.warn("PDF Export: Font/visibility check failed, but continuing:", fontError)
       }
       
       // Wait a bit more for any dynamic content to render

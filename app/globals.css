@@ -85,6 +85,8 @@ table.table-fixed th {
     height: auto !important;
     background: white !important;
     background-color: white !important;
+    color: #111827 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   }
 
   .pdf-container {
@@ -94,6 +96,23 @@ table.table-fixed th {
     overflow: visible !important;
     background: white !important;
     background-color: white !important;
+    color: #111827 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  }
+  
+  /* Ensure all text is visible */
+  .pdf-container * {
+    color: #111827 !important;
+  }
+  
+  .pdf-container td,
+  .pdf-container th,
+  .pdf-container p,
+  .pdf-container div,
+  .pdf-container span {
+    color: #111827 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
   .no-print {
