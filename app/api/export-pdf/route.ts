@@ -418,16 +418,17 @@ export async function GET(request: NextRequest) {
         
         // Trigger a reflow to ensure all styles are applied
         const container = document.querySelector('.pdf-container')
-        if (container) {
+        if (container && container instanceof HTMLElement) {
           container.offsetHeight // Force reflow
         }
         
         // Ensure all tables are visible
         const tables = document.querySelectorAll('table')
         tables.forEach((table) => {
-          const htmlTable = table as HTMLElement
-          htmlTable.style.display = 'table'
-          htmlTable.style.visibility = 'visible'
+          if (table instanceof HTMLElement) {
+            table.style.display = 'table'
+            table.style.visibility = 'visible'
+          }
         })
       })
 
