@@ -318,14 +318,52 @@ export async function GET(request: NextRequest) {
         throw new Error("Authentication failed - redirected to login page. Check cookie configuration.")
       }
 
-      console.log("PDF Export: Page loaded, waiting for PDF container...")
-      // Wait for content to be ready
+      console.log("PDF Export: Page loaded, waiting for content to be ready...")
+      
+      // Wait for React to hydrate and content to render
       try {
+        // First, wait for the PDF container to exist
         await page.waitForSelector(".pdf-container", { timeout: 15000 })
+        console.log("PDF Export: PDF container found")
+        
+        // Wait for React to finish rendering - check for specific content
+        await page.waitForFunction(
+          () => {
+            const container = document.querySelector('.pdf-container')
+            if (!container) return false
+            
+            // Check if we have actual content (not just empty divs)
+            const hasText = container.textContent && container.textContent.trim().length > 100
+            const hasTables = container.querySelectorAll('table').length > 0
+            
+            return hasText || hasTables
+          },
+          { timeout: 20000 }
+        )
+        console.log("PDF Export: Content rendered and ready")
+        
+        // Additional wait for any animations or transitions to complete
+        await new Promise((resolve) => setTimeout(resolve, 2000))
       } catch (selectorError: unknown) {
-        console.error("PDF Export: Could not find .pdf-container selector")
+        console.error("PDF Export: Could not find or wait for content")
+        console.error("PDF Export: Error details:", selectorError)
+        
+        // Try to get page content for debugging
+        try {
+          const pageContent = await page.content()
+          const contentLength = pageContent.length
+          const hasPdfContainer = pageContent.includes('pdf-container')
+          console.error("PDF Export: Debug info:", {
+            contentLength,
+            hasPdfContainer,
+            first500Chars: pageContent.substring(0, 500)
+          })
+        } catch (debugError) {
+          console.error("PDF Export: Could not get page content for debugging")
+        }
+        
         const errorMessage = selectorError instanceof Error ? selectorError.message : "Unknown error"
-        throw new Error(`PDF content not found: ${errorMessage}`)
+        throw new Error(`PDF content not found or not fully rendered: ${errorMessage}`)
       }
 
       // Wait for all images to load - with better error handling
