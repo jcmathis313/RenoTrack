@@ -173,6 +173,7 @@ export async function GET(request: NextRequest) {
               secure: boolean
               sameSite: "Lax" | "None" | "Strict"
               domain?: string
+              url?: string
             } = {
               name: name.trim(),
               value: decodeURIComponent(value),
@@ -182,9 +183,11 @@ export async function GET(request: NextRequest) {
               sameSite: "Lax",
             }
             
-            // Only set domain for non-localhost
-            if (!isLocalhost) {
-              cookieObj.domain = urlObj.hostname.replace(":3000", "").replace(":3001", "")
+            // For localhost, use URL instead of domain (Puppeteer requirement)
+            if (isLocalhost) {
+              cookieObj.url = baseUrl
+            } else {
+              cookieObj.domain = urlObj.hostname.replace(":3000", "").replace(":3001", "").replace(":3002", "")
             }
             
             return cookieObj
@@ -200,7 +203,7 @@ export async function GET(request: NextRequest) {
               console.warn(`PDF Export: Failed to set cookie ${cookie.name}:`, cookieError.message)
             }
           }
-          console.log(`PDF Export: Set ${cookieArray.length} cookies${isLocalhost ? " (localhost, no domain)" : ` for domain: ${urlObj.hostname}`}`)
+          console.log(`PDF Export: Set ${cookieArray.length} cookies${isLocalhost ? ` (localhost, using URL: ${baseUrl})` : ` for domain: ${urlObj.hostname}`}`)
         }
       } else {
         console.warn("PDF Export: No cookies found in request")
