@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type") // "selection", "assessment", etc.
     const id = searchParams.get("id")
+    const variant = searchParams.get("variant") // "rooms" or "categories" for selections
 
     if (!type || !id) {
       console.error("PDF Export: Missing parameters", { type, id })
@@ -34,9 +35,16 @@ export async function GET(request: NextRequest) {
     switch (type) {
       case "selection":
         pdfRoute = `/dashboard/selections/${id}/pdf`
+        // Add variant parameter if provided
+        if (variant) {
+          pdfRoute += `?variant=${variant}`
+        }
         break
       case "assessment":
         pdfRoute = `/dashboard/assessments/${id}/pdf`
+        break
+      case "inspection":
+        pdfRoute = `/dashboard/inspections/${id}/pdf`
         break
       default:
         return NextResponse.json(
@@ -69,10 +77,10 @@ export async function GET(request: NextRequest) {
     try {
       const page = await browser.newPage()
 
-      // Set viewport for consistent rendering
+      // Set viewport for consistent rendering - use large height to capture all content
       await page.setViewport({
-        width: 1200,
-        height: 1600,
+        width: 1920,
+        height: 10000, // Large height to ensure all content is visible
         deviceScaleFactor: 2,
       })
 
@@ -122,22 +130,62 @@ export async function GET(request: NextRequest) {
       // Wait for content to be ready
       await page.waitForSelector(".pdf-container", { timeout: 15000 })
 
+      // Wait for all images to load
+      await page.evaluate(() => {
+        return Promise.all(
+          Array.from(document.images)
+            .filter((img) => !img.complete)
+            .map(
+              (img) =>
+                new Promise((resolve, reject) => {
+                  img.onload = resolve
+                  img.onerror = reject
+                  // Timeout after 5 seconds
+                  setTimeout(() => reject(new Error("Image load timeout")), 5000)
+                })
+            )
+        )
+      }).catch(() => {
+        console.log("Some images may not have loaded, continuing anyway...")
+      })
+
       // Wait a bit more for any dynamic content to render
-      await page.waitForTimeout(1000)
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      
+      // Ensure the page height is calculated correctly
+      await page.evaluate(() => {
+        // Force layout recalculation
+        document.body.style.height = 'auto'
+        document.body.style.minHeight = '100vh'
+      })
 
       console.log("PDF Export: Generating PDF...")
+      
+      // Ensure print CSS is used
+      await page.emulateMediaType("print")
+      
+      const footerTemplate = `
+        <div style="width: 100%; font-size: 8pt; color: #6b7280; text-align: right; padding: 0 0.4in; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          Page <span class="pageNumber"></span> of <span class="totalPages"></span>
+        </div>
+      `
+      
       // Generate PDF with professional settings
       const pdfBuffer = await page.pdf({
         format: "Letter",
+        landscape: true,
         margin: {
-          top: "0.75in",
-          right: "0.75in",
-          bottom: "0.75in",
-          left: "0.75in",
+          top: "0.4in",
+          right: "0.4in",
+          bottom: "0.5in",
+          left: "0.4in",
         },
         printBackground: true,
-        preferCSSPageSize: false,
-        displayHeaderFooter: false,
+        preferCSSPageSize: true,
+        scale: 1,
+        displayHeaderFooter: true,
+        headerTemplate: "<div></div>",
+        footerTemplate: footerTemplate,
       })
 
       console.log(`PDF Export: PDF generated successfully (${pdfBuffer.length} bytes)`)

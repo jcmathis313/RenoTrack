@@ -6,6 +6,7 @@ import { GeneralSettings } from "@/components/settings/GeneralSettings"
 import { AssessmentSettings } from "@/components/settings/AssessmentSettings"
 import { UnitSettings } from "@/components/settings/UnitSettings"
 import { ComponentSettings } from "@/components/settings/ComponentSettings"
+import { VendorSettings } from "@/components/settings/VendorSettings"
 
 export default function SettingsPage() {
   return (
@@ -60,19 +61,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="vendors" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Vendor Settings</CardTitle>
-              <CardDescription>
-                Manage vendors and vendor-related settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-500">
-                Vendor settings will be available soon.
-              </p>
-            </CardContent>
-          </Card>
+          <VendorSettings />
         </TabsContent>
       </Tabs>
     </div>

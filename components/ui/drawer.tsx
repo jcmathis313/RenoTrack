@@ -49,17 +49,29 @@ const drawerVariants = cva(
 
 interface DrawerContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
-    VariantProps<typeof drawerVariants> {}
+    VariantProps<typeof drawerVariants> {
+  hideOverlay?: boolean
+}
 
 const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DrawerContentProps
->(({ side = "bottom", className, children, ...props }, ref) => (
+>(({ side = "bottom", className, children, hideOverlay = false, ...props }, ref) => (
   <DrawerPortal>
-    <DrawerOverlay />
+    {!hideOverlay && <DrawerOverlay />}
     <DialogPrimitive.Content
       ref={ref}
       className={cn(drawerVariants({ side }), className)}
+      onPointerDownOutside={(e) => {
+        if (hideOverlay) {
+          e.preventDefault()
+        }
+      }}
+      onInteractOutside={(e) => {
+        if (hideOverlay) {
+          e.preventDefault()
+        }
+      }}
       {...props}
     >
       {children}

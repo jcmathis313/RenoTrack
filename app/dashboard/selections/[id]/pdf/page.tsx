@@ -2,10 +2,14 @@ import { prisma } from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import SelectionPDFContent from "@/components/pdf/SelectionPDFContent"
+import PDFChromeHider from "@/components/pdf/PDFChromeHider"
 
 interface PageProps {
   params: {
     id: string
+  }
+  searchParams: {
+    variant?: string
   }
 }
 
@@ -30,6 +34,7 @@ async function getSelectionData(selectionId: string, tenantId: string) {
                 select: {
                   id: true,
                   name: true,
+                  logoUrl: true,
                 },
               },
             },
@@ -76,14 +81,19 @@ async function getComponentStatuses(tenantId: string) {
   return statuses
 }
 
-export default async function SelectionPDFPage({ params }: PageProps) {
+export default async function SelectionPDFPage({ params, searchParams }: PageProps) {
   try {
     const user = await getCurrentUser()
     if (!user) {
       redirect("/login")
     }
 
-    const selection = await getSelectionData(params.id, user.tenantId)
+    // Ensure params is resolved (for Next.js 15+ compatibility)
+    const resolvedParams = params instanceof Promise ? await params : params
+    const resolvedSearchParams = searchParams instanceof Promise ? await searchParams : searchParams
+    const variant = resolvedSearchParams?.variant || "categories" // Default to categories
+
+    const selection = await getSelectionData(resolvedParams.id, user.tenantId)
     if (!selection) {
       return (
         <div style={{ padding: "2rem", textAlign: "center" }}>
@@ -112,11 +122,39 @@ export default async function SelectionPDFPage({ params }: PageProps) {
           manufacturer: true,
           finish: true,
           color: true,
+          imageUrl: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       })
     : []
 
   const catalogMap = new Map(catalogItems.map((item) => [item.id, item]))
+
+  // Fetch vendors for vendor references
+  const vendorIds = selection.designRooms
+    .flatMap((room) => room.designComponents)
+    .map((comp) => comp.vendorId)
+    .filter((id): id is string => id !== null)
+
+  const vendors = vendorIds.length > 0
+    ? await prisma.vendor.findMany({
+        where: {
+          id: { in: vendorIds },
+          tenantId: user.tenantId,
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      })
+    : []
+
+  const vendorMap = new Map(vendors.map((vendor) => [vendor.id, vendor]))
 
   // Attach catalog items to components
   const selectionWithMaterials = {
@@ -131,6 +169,7 @@ export default async function SelectionPDFPage({ params }: PageProps) {
       designComponents: room.designComponents.map((comp) => ({
         ...comp,
         material: comp.materialId ? catalogMap.get(comp.materialId) || null : null,
+        vendor: comp.vendorId ? vendorMap.get(comp.vendorId) || null : null,
       })),
     })),
   }
@@ -139,11 +178,15 @@ export default async function SelectionPDFPage({ params }: PageProps) {
   const componentStatuses = await getComponentStatuses(user.tenantId)
 
     return (
-      <SelectionPDFContent
-        selection={selectionWithMaterials}
-        tenantSettings={tenantSettings}
-        componentStatuses={componentStatuses}
-      />
+      <>
+        <PDFChromeHider />
+        <SelectionPDFContent
+          selection={selectionWithMaterials}
+          tenantSettings={tenantSettings}
+          componentStatuses={componentStatuses}
+          variant={variant as "rooms" | "categories"}
+        />
+      </>
     )
   } catch (error: any) {
     console.error("Error rendering PDF page:", error)

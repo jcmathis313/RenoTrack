@@ -30,7 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { ArrowLeftIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ArrowUpIcon, ArrowDownIcon } from "@heroicons/react/24/outline"
+import { ArrowLeftIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ArrowUpIcon, ArrowDownIcon, ArrowDownTrayIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
 
 interface ComponentCategory {
@@ -106,6 +106,7 @@ export default function AssessmentDetailPage() {
   const [showRoomDropdown, setShowRoomDropdown] = useState(false)
   const [selectedRoomIndex, setSelectedRoomIndex] = useState(-1)
   const [addingRoom, setAddingRoom] = useState(false)
+  const [exportingPDF, setExportingPDF] = useState(false)
 
   const [newComponent, setNewComponent] = useState({
     selectedComponents: [] as Array<{ categoryId: string; categoryName: string; componentId: string; componentName: string }>,
@@ -544,20 +545,52 @@ export default function AssessmentDetailPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/assessments">
-              <ArrowLeftIcon className="h-4 w-4 mr-2" />
-              Back
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Assessment</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              {assessment.unit.building.community.name} - {assessment.unit.building.name} - Unit {assessment.unit.number}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Assessment</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {assessment.unit.building.community.name} - {assessment.unit.building.name} - Unit {assessment.unit.number}
+          </p>
         </div>
+        <Button
+          variant="outline"
+          disabled={exportingPDF}
+          onClick={async () => {
+            setExportingPDF(true)
+            try {
+              const response = await fetch(`/api/export-pdf?type=assessment&id=${assessmentId}`)
+              const contentType = response.headers.get("content-type")
+              if (!response.ok || !contentType?.includes("application/pdf")) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(
+                  errorData.error ||
+                    errorData.details ||
+                    `Failed to generate PDF: ${response.status} ${response.statusText}`
+                )
+              }
+              const blob = await response.blob()
+              const url = window.URL.createObjectURL(blob)
+              const a = document.createElement("a")
+              a.href = url
+              a.download = `assessment-${assessmentId}-${Date.now()}.pdf`
+              document.body.appendChild(a)
+              a.click()
+              window.URL.revokeObjectURL(url)
+              document.body.removeChild(a)
+            } catch (error: any) {
+              console.error("Error exporting PDF:", error)
+              alert(error?.message || "Failed to export PDF")
+            } finally {
+              setExportingPDF(false)
+            }
+          }}
+        >
+          {exportingPDF ? (
+            <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+          )}
+          {exportingPDF ? "Generating PDF..." : "Export PDF"}
+        </Button>
       </div>
 
       {/* Assessment Info */}

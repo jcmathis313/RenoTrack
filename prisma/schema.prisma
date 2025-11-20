@@ -26,6 +26,7 @@ model Tenant {
   componentCategories ComponentCategory[]
   components          Component[]
   catalogItems        CatalogItem[]
+  vendors             Vendor[]
 
   @@index([slug])
 }
@@ -170,6 +171,22 @@ model DesignRoom {
   @@index([designProjectId])
 }
 
+model Vendor {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  contact   String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  designComponents DesignComponent[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
 model DesignComponent {
   id              String   @id @default(cuid())
   designRoomId    String
@@ -187,8 +204,10 @@ model DesignComponent {
   updatedAt       DateTime @updatedAt
 
   designRoom DesignRoom @relation(fields: [designRoomId], references: [id], onDelete: Cascade)
+  vendor     Vendor?    @relation(fields: [vendorId], references: [id], onDelete: SetNull)
 
   @@index([designRoomId])
+  @@index([vendorId])
 }
 
 model TenantSettings {

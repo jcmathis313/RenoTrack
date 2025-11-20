@@ -31,10 +31,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { ArrowLeftIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon } from "@heroicons/react/24/outline"
+import { ArrowLeftIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
 import { CatalogItemSelectModal } from "@/components/CatalogItemSelectModal"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer"
 
 interface ComponentCategory {
   id: string
@@ -131,6 +145,7 @@ export default function SelectionDetailPage() {
   const [componentStatuses, setComponentStatuses] = useState<ComponentStatus[]>([])
   const [roomTemplates, setRoomTemplates] = useState<RoomTemplate[]>([])
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([])
+  const [vendors, setVendors] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [addRoomOpen, setAddRoomOpen] = useState(false)
   const [addComponentOpen, setAddComponentOpen] = useState<string | null>(null)
@@ -155,6 +170,7 @@ export default function SelectionDetailPage() {
     componentType: string
     condition: string
     materialId: string
+    vendorId: string | null
     notes: string
     residentUpgrade: string
     quantity: number
@@ -164,9 +180,19 @@ export default function SelectionDetailPage() {
   const [deletingComponent, setDeletingComponent] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [viewMode, setViewMode] = useState<"rooms" | "category" | "upgrade" | "condition">("rooms")
+  const [viewMode, setViewMode] = useState<"rooms" | "category" | "upgrade" | "condition" | "vendors">("rooms")
   const [selectedComponentIds, setSelectedComponentIds] = useState<Set<string>>(new Set())
   const actionToastIdRef = React.useRef<string | number | null>(null)
+  
+  // Bulk actions state
+  const [bulkActions, setBulkActions] = useState({
+    vendorId: "",
+    condition: "",
+    residentUpgrade: "",
+    quantity: "",
+    unitCost: "",
+  })
+  const [applyingBulkActions, setApplyingBulkActions] = useState(false)
 
   useEffect(() => {
     if (selectionId) {
@@ -186,12 +212,13 @@ export default function SelectionDetailPage() {
 
     setLoading(true)
     try {
-      const [selectionRes, categoriesRes, statusesRes, roomTemplatesRes, catalogRes] = await Promise.all([
+      const [selectionRes, categoriesRes, statusesRes, roomTemplatesRes, catalogRes, vendorsRes] = await Promise.all([
         fetch(`/api/selections/${selectionId}`),
         fetch("/api/settings/component-category"),
         fetch("/api/settings/component-status"),
         fetch("/api/settings/room-template"),
         fetch("/api/catalog"),
+        fetch("/api/settings/vendors"),
       ])
 
       if (!selectionRes.ok) {
@@ -216,6 +243,9 @@ export default function SelectionDetailPage() {
 
       const catalogData = await catalogRes.json()
       setCatalogItems(catalogData)
+
+      const vendorsData = await vendorsRes.json()
+      setVendors(vendorsData)
     } catch (error) {
       console.error("Error fetching data:", error)
     } finally {
@@ -437,6 +467,7 @@ export default function SelectionDetailPage() {
       componentType: component.componentType,
       condition: component.condition || "",
       materialId: component.materialId || "",
+      vendorId: component.vendorId || null,
       notes: component.notes || "",
       residentUpgrade: component.residentUpgrade === true ? "upgrade" : component.residentUpgrade === false ? "included" : "",
       quantity: component.quantity || 1,
@@ -456,6 +487,7 @@ export default function SelectionDetailPage() {
           componentType: editingComponent?.componentType || "",
           condition: editingComponent?.condition?.trim() || null,
           materialId: editingComponent?.materialId?.trim() || null,
+          vendorId: editingComponent?.vendorId?.trim() || null,
           notes: editingComponent?.notes?.trim() || null,
           residentUpgrade: editingComponent?.residentUpgrade === "upgrade" ? true : editingComponent?.residentUpgrade === "included" ? false : null,
           quantity: editingComponent?.quantity || 1,
@@ -622,6 +654,31 @@ export default function SelectionDetailPage() {
           groupLabel: condition,
           components: comps,
         }))
+    } else if (viewMode === "vendors") {
+      // Group by vendor
+      const grouped = new Map<string, typeof allComponents>()
+      allComponents.forEach((comp) => {
+        const vendorId = comp.vendorId || "__no_vendor__"
+        const vendor = vendors.find((v) => v.id === vendorId)
+        const vendorName = vendor ? vendor.name : "No Vendor"
+        if (!grouped.has(vendorName)) {
+          grouped.set(vendorName, [])
+        }
+        grouped.get(vendorName)!.push(comp)
+      })
+      // Sort vendors alphabetically, with "No Vendor" at the end
+      return Array.from(grouped.entries())
+        .sort(([a], [b]) => {
+          if (a === "No Vendor") return 1
+          if (b === "No Vendor") return -1
+          return a.localeCompare(b)
+        })
+        .map(([vendorName, comps]) => ({
+          groupKey: vendorName,
+          groupLabel: vendorName,
+          components: comps,
+        }))
+        .filter((group) => group.components.length > 0)
     }
     return []
   }
@@ -636,6 +693,64 @@ export default function SelectionDetailPage() {
       }
       return newSet
     })
+  }
+
+  const handleExportPDF = async (variant: "rooms" | "categories") => {
+    setExportingPDF(true)
+    try {
+      console.log("Starting PDF export...", variant)
+      const response = await fetch(`/api/export-pdf?type=selection&id=${selectionId}&variant=${variant}`)
+      
+      console.log("Response status:", response.status)
+      console.log("Response headers:", Object.fromEntries(response.headers.entries()))
+      
+      // Check if response is JSON (error) or PDF
+      const contentType = response.headers.get("content-type")
+      console.log("Content type:", contentType)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Error response:", errorData)
+        throw new Error(errorData.error || errorData.details || `Failed to generate PDF: ${response.status} ${response.statusText}`)
+      }
+      
+      if (!contentType?.includes("application/pdf")) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Non-PDF response:", errorData)
+        throw new Error(errorData.error || errorData.details || "Server did not return a PDF")
+      }
+      
+      const blob = await response.blob()
+      console.log("Blob received:", blob.type, blob.size, "bytes")
+      
+      // Verify it's actually a PDF
+      if (blob.type !== "application/pdf") {
+        const text = await blob.text()
+        console.error("Non-PDF blob content:", text.substring(0, 200))
+        try {
+          const errorJson = JSON.parse(text)
+          throw new Error(errorJson.error || errorJson.details || "Failed to generate PDF")
+        } catch {
+          throw new Error("Server returned non-PDF response")
+        }
+      }
+      
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+              const variantLabel = variant === "rooms" ? "by-room" : "by-category"
+              a.download = `selection-${selection?.name || "export"}-${variantLabel}-${Date.now()}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      console.log("PDF downloaded successfully")
+    } catch (error: any) {
+      console.error("Error exporting PDF:", error)
+      alert(`Failed to export PDF: ${error?.message || "Unknown error"}\n\nCheck the browser console for more details.`)
+    } finally {
+      setExportingPDF(false)
+    }
   }
 
   if (loading) {
@@ -658,83 +773,45 @@ export default function SelectionDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/selections">
-              <ArrowLeftIcon className="h-4 w-4 mr-2" />
-              Back
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{selection.name}</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Selection Meeting Details
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{selection.name}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Selection Meeting Details
+          </p>
         </div>
-        <Button
-          variant="outline"
-          disabled={exportingPDF}
-          onClick={async () => {
-            setExportingPDF(true)
-            try {
-              console.log("Starting PDF export...")
-              const response = await fetch(`/api/export-pdf?type=selection&id=${selectionId}`)
-              
-              console.log("Response status:", response.status)
-              console.log("Response headers:", Object.fromEntries(response.headers.entries()))
-              
-              // Check if response is JSON (error) or PDF
-              const contentType = response.headers.get("content-type")
-              console.log("Content type:", contentType)
-              
-              if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}))
-                console.error("Error response:", errorData)
-                throw new Error(errorData.error || errorData.details || `Failed to generate PDF: ${response.status} ${response.statusText}`)
-              }
-              
-              if (!contentType?.includes("application/pdf")) {
-                const errorData = await response.json().catch(() => ({}))
-                console.error("Non-PDF response:", errorData)
-                throw new Error(errorData.error || errorData.details || "Server did not return a PDF")
-              }
-              
-              const blob = await response.blob()
-              console.log("Blob received:", blob.type, blob.size, "bytes")
-              
-              // Verify it's actually a PDF
-              if (blob.type !== "application/pdf") {
-                const text = await blob.text()
-                console.error("Non-PDF blob content:", text.substring(0, 200))
-                try {
-                  const errorJson = JSON.parse(text)
-                  throw new Error(errorJson.error || errorJson.details || "Failed to generate PDF")
-                } catch {
-                  throw new Error("Server returned non-PDF response")
-                }
-              }
-              
-              const url = window.URL.createObjectURL(blob)
-              const a = document.createElement("a")
-              a.href = url
-              a.download = `selection-${selection.name}-${Date.now()}.pdf`
-              document.body.appendChild(a)
-              a.click()
-              window.URL.revokeObjectURL(url)
-              document.body.removeChild(a)
-              console.log("PDF downloaded successfully")
-            } catch (error: any) {
-              console.error("Error exporting PDF:", error)
-              alert(`Failed to export PDF: ${error?.message || "Unknown error"}\n\nCheck the browser console for more details.`)
-            } finally {
-              setExportingPDF(false)
-            }
-          }}
-        >
-          <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-          {exportingPDF ? "Generating PDF..." : "Export PDF"}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              disabled={exportingPDF}
+            >
+              {exportingPDF ? (
+                <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+              )}
+              {exportingPDF ? "Generating PDF..." : "Export PDF"}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              disabled={exportingPDF}
+              onClick={async () => {
+                await handleExportPDF("rooms")
+              }}
+            >
+              Grouped by Room
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={exportingPDF}
+              onClick={async () => {
+                await handleExportPDF("categories")
+              }}
+            >
+              Grouped by Category
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Card>
@@ -824,27 +901,274 @@ export default function SelectionDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Bulk Actions Drawer */}
+      <Drawer 
+        open={selectedComponentIds.size > 0} 
+        onOpenChange={(open) => {
+          // Prevent closing via outside click - only close when explicitly requested
+          // If there are still selections, keep the drawer open
+          if (!open && selectedComponentIds.size > 0) {
+            // Prevent closing - don't update state
+            return
+          }
+          // Only reset bulk actions when drawer closes and no selections remain
+          if (!open && selectedComponentIds.size === 0) {
+            setBulkActions({
+              vendorId: "",
+              condition: "",
+              residentUpgrade: "",
+              quantity: "",
+              unitCost: "",
+            })
+          }
+        }}
+        modal={false}
+      >
+        <DrawerContent 
+          side="right" 
+          className="w-full sm:max-w-md [&>button]:hidden" 
+          hideOverlay={true}
+        >
+          {/* Custom close button */}
+          <button
+            type="button"
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 z-10"
+            onClick={() => {
+              setSelectedComponentIds(new Set())
+              setBulkActions({
+                vendorId: "",
+                condition: "",
+                residentUpgrade: "",
+                quantity: "",
+                unitCost: "",
+              })
+            }}
+          >
+            <span className="sr-only">Close</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+          <DrawerHeader>
+            <DrawerTitle>Bulk Actions</DrawerTitle>
+            <DrawerDescription>
+              {selectedComponentIds.size} component{selectedComponentIds.size !== 1 ? "s" : ""} selected
+            </DrawerDescription>
+          </DrawerHeader>
+          
+          <div className="px-6 py-4 space-y-6 overflow-y-auto">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Vendor</Label>
+                <Select
+                  value={bulkActions.vendorId}
+                  onValueChange={(value) => setBulkActions({ ...bulkActions, vendorId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select vendor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__clear__">Clear</SelectItem>
+                    {vendors.map((vendor) => (
+                      <SelectItem key={vendor.id} value={vendor.id}>
+                        {vendor.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Condition</Label>
+                <Select
+                  value={bulkActions.condition}
+                  onValueChange={(value) => setBulkActions({ ...bulkActions, condition: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select condition" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__clear__">Clear</SelectItem>
+                    {componentStatuses.map((status) => (
+                      <SelectItem key={status.id} value={status.name}>
+                        {status.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Upgrade</Label>
+                <Select
+                  value={bulkActions.residentUpgrade}
+                  onValueChange={(value) => setBulkActions({ ...bulkActions, residentUpgrade: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select upgrade status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__clear__">Clear</SelectItem>
+                    <SelectItem value="upgrade">Upgrade</SelectItem>
+                    <SelectItem value="included">Included</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Quantity</Label>
+                <Input
+                  type="number"
+                  value={bulkActions.quantity}
+                  onChange={(e) => setBulkActions({ ...bulkActions, quantity: e.target.value })}
+                  placeholder="Set quantity"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Price</Label>
+                <Input
+                  type="number"
+                  value={bulkActions.unitCost}
+                  onChange={(e) => setBulkActions({ ...bulkActions, unitCost: e.target.value })}
+                  placeholder="Set price"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DrawerFooter>
+            <Button
+              onClick={async () => {
+                const hasChanges = 
+                  bulkActions.vendorId !== "" ||
+                  bulkActions.condition !== "" ||
+                  bulkActions.residentUpgrade !== "" ||
+                  bulkActions.quantity !== "" ||
+                  bulkActions.unitCost !== ""
+
+                if (!hasChanges) {
+                  alert("Please select at least one action to apply")
+                  return
+                }
+
+                setApplyingBulkActions(true)
+                try {
+                  const updates: any = {}
+
+                  if (bulkActions.vendorId !== "") {
+                    updates.vendorId = bulkActions.vendorId === "__clear__" ? null : bulkActions.vendorId
+                  }
+                  if (bulkActions.condition !== "") {
+                    updates.condition = bulkActions.condition === "__clear__" ? null : bulkActions.condition
+                  }
+                  if (bulkActions.residentUpgrade !== "") {
+                    updates.residentUpgrade = bulkActions.residentUpgrade === "__clear__" ? null : bulkActions.residentUpgrade
+                  }
+                  if (bulkActions.quantity !== "") {
+                    updates.quantity = parseFloat(bulkActions.quantity)
+                  }
+                  if (bulkActions.unitCost !== "") {
+                    updates.unitCost = parseFloat(bulkActions.unitCost)
+                  }
+
+                  const response = await fetch("/api/design-components/bulk", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      componentIds: Array.from(selectedComponentIds),
+                      updates,
+                    }),
+                  })
+
+                  if (!response.ok) {
+                    const data = await response.json()
+                    throw new Error(data.error || "Failed to apply bulk actions")
+                  }
+
+                  const result = await response.json()
+                  const updatedCount = result.updated || selectedComponentIds.size
+
+                  // Reset bulk actions and selection
+                  setSelectedComponentIds(new Set())
+                  setBulkActions({
+                    vendorId: "",
+                    condition: "",
+                    residentUpgrade: "",
+                    quantity: "",
+                    unitCost: "",
+                  })
+
+                  // Refresh data
+                  fetchData()
+                  
+                  alert(`Successfully updated ${updatedCount} component(s)`)
+                } catch (error: any) {
+                  console.error("Error applying bulk actions:", error)
+                  alert(`Failed to apply bulk actions: ${error.message}`)
+                } finally {
+                  setApplyingBulkActions(false)
+                }
+              }}
+              disabled={applyingBulkActions}
+            >
+              {applyingBulkActions ? "Applying..." : "Apply Changes"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedComponentIds(new Set())
+                setBulkActions({
+                  vendorId: "",
+                  condition: "",
+                  residentUpgrade: "",
+                  quantity: "",
+                  unitCost: "",
+                })
+              }}
+            >
+              Clear Selection
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <div className="flex gap-1 border rounded-md p-1">
-            {(["rooms", "category", "upgrade", "condition"] as const).map((mode) => (
-              <Button
-                key={mode}
-                variant={viewMode === mode ? "default" : "ghost"}
-                size="sm"
-                onClick={() => {
-                  setViewMode(mode)
-                  setSelectedComponentIds(new Set())
-                }}
-                className={cn(
-                  "capitalize",
-                  viewMode === mode ? "bg-gray-900 text-white hover:bg-gray-800" : ""
-                )}
-              >
-                {mode === "rooms" ? "Rooms" : mode === "category" ? "Category" : mode === "upgrade" ? "Upgrade" : "Condition"}
-              </Button>
-            ))}
-          </div>
+          <Select
+            value={viewMode}
+            onValueChange={(value) => {
+              setViewMode(value as typeof viewMode)
+              setSelectedComponentIds(new Set())
+            }}
+          >
+            <SelectTrigger className="w-[150px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="rooms">Rooms</SelectItem>
+              <SelectItem value="category">Category</SelectItem>
+              <SelectItem value="upgrade">Upgrade</SelectItem>
+              <SelectItem value="condition">Condition</SelectItem>
+              <SelectItem value="vendors">Vendors</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         {viewMode === "rooms" && (
           <Button onClick={() => setAddRoomOpen(true)}>
@@ -885,7 +1209,7 @@ export default function SelectionDetailPage() {
                 <p className="text-sm text-gray-500">No components yet.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[40px]">
@@ -921,13 +1245,14 @@ export default function SelectionDetailPage() {
                         </TableHead>
                         <TableHead className="w-[280px]">Catalog Item</TableHead>
                         <TableHead className="w-[100px] text-center">Upgrade</TableHead>
+                        <TableHead className="w-[120px]">Vendor</TableHead>
                         <TableHead className="w-[100px]">
                           <div className="flex flex-col">
                             <span>Quantity</span>
                             <span>/ Price</span>
                           </div>
                         </TableHead>
-                        <TableHead className="flex-1">Notes</TableHead>
+                        <TableHead className="w-[300px]">Notes</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1114,6 +1439,7 @@ export default function SelectionDetailPage() {
                                             componentType: component.componentType,
                                             condition: component.condition || "",
                                             materialId: component.materialId || "",
+                                            vendorId: component.vendorId || null,
                                             notes: component.notes || "",
                                             residentUpgrade: component.residentUpgrade === true ? "upgrade" : component.residentUpgrade === false ? "included" : "",
                                             quantity: component.quantity || 1,
@@ -1148,16 +1474,17 @@ export default function SelectionDetailPage() {
                                           setCatalogModalOpen(false)
                                           setTimeout(() => {
                                             setEditingComponentId(component.id)
-                                            setEditingComponent({
-                                              componentType: component.componentType,
-                                              condition: component.condition || "",
-                                              materialId: component.materialId || "",
-                                              notes: component.notes || "",
-                                              residentUpgrade: component.residentUpgrade === true ? "upgrade" : component.residentUpgrade === false ? "included" : "",
-                                              quantity: component.quantity || 1,
-                                              unitCost: component.unitCost || 0,
-                                            })
-                                            setCatalogModalOpen(true)
+                                          setEditingComponent({
+                                            componentType: component.componentType,
+                                            condition: component.condition || "",
+                                            materialId: component.materialId || "",
+                                            vendorId: component.vendorId || null,
+                                            notes: component.notes || "",
+                                            residentUpgrade: component.residentUpgrade === true ? "upgrade" : component.residentUpgrade === false ? "included" : "",
+                                            quantity: component.quantity || 1,
+                                            unitCost: component.unitCost || 0,
+                                          })
+                                          setCatalogModalOpen(true)
                                           }, 100)
                                         } else {
                                           setEditingComponentId(component.id)
@@ -1165,6 +1492,7 @@ export default function SelectionDetailPage() {
                                             componentType: component.componentType,
                                             condition: component.condition || "",
                                             materialId: component.materialId || "",
+                                            vendorId: component.vendorId || null,
                                             notes: component.notes || "",
                                             residentUpgrade: component.residentUpgrade === true ? "upgrade" : component.residentUpgrade === false ? "included" : "",
                                             quantity: component.quantity || 1,
@@ -1233,6 +1561,43 @@ export default function SelectionDetailPage() {
                                 ) : (
                                   "—"
                                 )}
+                              </div>
+                            )}
+                          </TableCell>
+                          
+                          {/* Vendor Column */}
+                          <TableCell>
+                            {editingComponentId === component.id ? (
+                              <div className="space-y-2">
+                                <Label className="text-xs">Vendor</Label>
+                                <Select
+                                  value={editingComponent?.vendorId || undefined}
+                                  onValueChange={(value) =>
+                                    editingComponent && setEditingComponent({
+                                      ...editingComponent,
+                                      vendorId: value === "__none__" ? null : value || null,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Select vendor" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">None</SelectItem>
+                                    {vendors.map((vendor) => (
+                                      <SelectItem key={vendor.id} value={vendor.id}>
+                                        {vendor.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            ) : (
+                              <div className="text-xs">
+                                {(() => {
+                                  const vendor = vendors.find(v => v.id === component.vendorId)
+                                  return vendor ? vendor.name : "—"
+                                })()}
                               </div>
                             )}
                           </TableCell>
@@ -1360,7 +1725,7 @@ export default function SelectionDetailPage() {
           </Card>
             )
           } else {
-            // For other views (category, upgrade, condition)
+            // For other views (category, upgrade, condition, vendors)
             return (
               <Card key={group.groupKey}>
                 <CardHeader>
@@ -1371,51 +1736,52 @@ export default function SelectionDetailPage() {
                     <p className="text-sm text-gray-500">No components yet.</p>
                   ) : (
                     <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[40px]">
-                              <input
-                                type="checkbox"
-                                checked={group.components.length > 0 && group.components.every((c) => selectedComponentIds.has(c.id))}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    group.components.forEach((c) => setSelectedComponentIds((prev) => {
-                                      const newSet = new Set(prev)
-                                      newSet.add(c.id)
-                                      return newSet
-                                    }))
-                                  } else {
-                                    group.components.forEach((c) =>
-                                      setSelectedComponentIds((prev) => {
-                                        const newSet = new Set(prev)
-                                        newSet.delete(c.id)
-                                        return newSet
-                                      })
-                                    )
-                                  }
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </TableHead>
-                            <TableHead className="w-[120px]">Room</TableHead>
-                            <TableHead className="w-[120px]">
-                              <div className="flex flex-col">
-                                <span>Component</span>
-                                <span>/ Type</span>
-                              </div>
-                            </TableHead>
-                            <TableHead className="w-[280px]">Catalog Item</TableHead>
-                            <TableHead className="w-[100px] text-center">Upgrade</TableHead>
-                            <TableHead className="w-[100px]">
-                              <div className="flex flex-col">
-                                <span>Quantity</span>
-                                <span>/ Price</span>
-                              </div>
-                            </TableHead>
-                            <TableHead className="flex-1">Notes</TableHead>
-                          </TableRow>
-                        </TableHeader>
+                  <Table className="table-fixed w-full">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[40px]">
+                          <input
+                            type="checkbox"
+                            checked={group.components.length > 0 && group.components.every((c) => selectedComponentIds.has(c.id))}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                group.components.forEach((c) => setSelectedComponentIds((prev) => {
+                                  const newSet = new Set(prev)
+                                  newSet.add(c.id)
+                                  return newSet
+                                }))
+                              } else {
+                                group.components.forEach((c) =>
+                                  setSelectedComponentIds((prev) => {
+                                    const newSet = new Set(prev)
+                                    newSet.delete(c.id)
+                                    return newSet
+                                  })
+                                )
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[120px]">Room</TableHead>
+                        <TableHead className="w-[120px]">
+                          <div className="flex flex-col">
+                            <span>Component</span>
+                            <span>/ Type</span>
+                          </div>
+                        </TableHead>
+                        <TableHead className="w-[280px]">Catalog Item</TableHead>
+                        <TableHead className="w-[100px] text-center">Upgrade</TableHead>
+                        <TableHead className="w-[120px]">Vendor</TableHead>
+                        <TableHead className="w-[100px]">
+                          <div className="flex flex-col">
+                            <span>Quantity</span>
+                            <span>/ Price</span>
+                          </div>
+                        </TableHead>
+                        <TableHead className="w-[300px]">Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
                         <TableBody>
                           {group.components.map((component) => (
                             <TableRow
@@ -1681,6 +2047,43 @@ export default function SelectionDetailPage() {
                                     ) : (
                                       "—"
                                     )}
+                                  </div>
+                                )}
+                              </TableCell>
+                              
+                              {/* Vendor Column */}
+                              <TableCell>
+                                {editingComponentId === component.id ? (
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Vendor</Label>
+                                    <Select
+                                      value={editingComponent?.vendorId || undefined}
+                                      onValueChange={(value) =>
+                                        setEditingComponent({
+                                          ...editingComponent!,
+                                          vendorId: value === "__none__" ? null : value || null,
+                                        })
+                                      }
+                                    >
+                                      <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="Select vendor" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="__none__">None</SelectItem>
+                                        {vendors.map((vendor) => (
+                                          <SelectItem key={vendor.id} value={vendor.id}>
+                                            {vendor.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                ) : (
+                                  <div className="text-xs">
+                                    {(() => {
+                                      const vendor = vendors.find(v => v.id === component.vendorId)
+                                      return vendor ? vendor.name : "—"
+                                    })()}
                                   </div>
                                 )}
                               </TableCell>

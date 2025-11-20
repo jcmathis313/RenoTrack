@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, CameraIcon, PencilIcon } from "@heroicons/react/24/outline"
+import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, CameraIcon, PencilIcon, ArrowDownTrayIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
 import {
   Select,
   SelectContent,
@@ -109,6 +109,7 @@ export default function InspectionDetailPage() {
   const [notesText, setNotesText] = useState("")
   const [savingNotes, setSavingNotes] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [exportingPDF, setExportingPDF] = useState(false)
 
   useEffect(() => {
     if (inspectionId) {
@@ -335,20 +336,52 @@ export default function InspectionDetailPage() {
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/inspections">
-              <ArrowLeftIcon className="h-4 w-4 mr-2" />
-              Back
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900">{inspection.designProject.name}</h1>
-            <p className="text-xs md:text-sm text-gray-500 mt-1">
-              Inspection Details
-            </p>
-          </div>
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">{inspection.designProject.name}</h1>
+          <p className="text-xs md:text-sm text-gray-500 mt-1">
+            Inspection Details
+          </p>
         </div>
+        <Button
+          variant="outline"
+          disabled={exportingPDF}
+          onClick={async () => {
+            setExportingPDF(true)
+            try {
+              const response = await fetch(`/api/export-pdf?type=inspection&id=${inspectionId}`)
+              const contentType = response.headers.get("content-type")
+              if (!response.ok || !contentType?.includes("application/pdf")) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(
+                  errorData.error ||
+                    errorData.details ||
+                    `Failed to generate PDF: ${response.status} ${response.statusText}`
+                )
+              }
+              const blob = await response.blob()
+              const url = window.URL.createObjectURL(blob)
+              const a = document.createElement("a")
+              a.href = url
+              a.download = `inspection-${inspectionId}-${Date.now()}.pdf`
+              document.body.appendChild(a)
+              a.click()
+              window.URL.revokeObjectURL(url)
+              document.body.removeChild(a)
+            } catch (error: any) {
+              console.error("Error exporting PDF:", error)
+              alert(error?.message || "Failed to export PDF")
+            } finally {
+              setExportingPDF(false)
+            }
+          }}
+        >
+          {exportingPDF ? (
+            <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+          )}
+          {exportingPDF ? "Generating PDF..." : "Export PDF"}
+        </Button>
       </div>
 
       <Card>

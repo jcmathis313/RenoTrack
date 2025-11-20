@@ -1,5 +1,7 @@
 "use client"
 
+import React from "react"
+
 interface ComponentStatus {
   id: string
   name: string
@@ -20,6 +22,11 @@ interface CatalogItem {
   manufacturer: string | null
   finish: string | null
   color: string | null
+  imageUrl: string | null
+  category?: {
+    id: string
+    name: string
+  } | null
 }
 
 interface DesignComponent {
@@ -28,12 +35,17 @@ interface DesignComponent {
   componentName: string | null
   condition: string | null
   materialId: string | null
+  vendorId: string | null
   quantity: number
   unitCost: number
   totalCost: number
   notes: string | null
   residentUpgrade?: boolean | null
   material?: CatalogItem | null
+  vendor?: {
+    id: string
+    name: string
+  } | null
 }
 
 interface DesignRoom {
@@ -56,6 +68,7 @@ interface Selection {
       community: {
         id: string
         name: string
+        logoUrl?: string | null
       }
     }
   }
@@ -71,13 +84,14 @@ interface SelectionPDFContentProps {
   selection: Selection
   tenantSettings: TenantSettings | null
   componentStatuses: ComponentStatus[]
+  variant?: "rooms" | "categories"
 }
 
 const getStatusColor = (statusName: string | null, statuses: ComponentStatus[]): string => {
   if (!statusName) return "#6b7280"
   const status = statuses.find((s) => s.name === statusName)
   if (!status) return "#6b7280"
-  
+
   const colorMap: Record<string, string> = {
     green: "#10b981",
     blue: "#3b82f6",
@@ -86,17 +100,28 @@ const getStatusColor = (statusName: string | null, statuses: ComponentStatus[]):
     gray: "#6b7280",
     yellow: "#eab308",
   }
-  
+
   return colorMap[status.color || "gray"] || "#6b7280"
+}
+
+const getConditionColor = (condition: string | null): string => {
+  if (!condition) return "#6b7280"
+  const upper = condition.toUpperCase()
+  if (upper === "REPLACE") return "#f97316" // Orange
+  if (upper === "KEEP") return "#10b981" // Green
+  return "#6b7280" // Gray
 }
 
 export default function SelectionPDFContent({
   selection,
   tenantSettings,
   componentStatuses,
+  variant = "categories",
 }: SelectionPDFContentProps) {
   const companyName = tenantSettings?.companyName || "Your Company"
   const businessAddress = tenantSettings?.businessAddress || ""
+  const accentColor = "#111827" // Black for monochrome theme
+
   const generatedAt = new Date().toLocaleString("en-US", {
     year: "numeric",
     month: "long",
@@ -105,18 +130,49 @@ export default function SelectionPDFContent({
     minute: "2-digit",
   })
 
-  const totalCost = selection.designRooms.reduce(
-    (sum, room) =>
-      sum +
-      room.designComponents.reduce((roomSum, comp) => roomSum + (comp.totalCost || 0), 0),
-    0
-  )
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
     }).format(amount)
+  }
+
+  const allComponents = selection.designRooms.flatMap((room) =>
+    room.designComponents.map((comp) => ({ ...comp, roomName: room.name }))
+  )
+
+  const totalCost = allComponents.reduce((sum, comp) => sum + (comp.totalCost || 0), 0)
+
+  // Group by category or room based on variant
+  let groupedData: Record<string, (DesignComponent & { roomName: string })[]>
+  let sortedGroups: string[]
+
+  if (variant === "rooms") {
+    // Group by room
+    groupedData = selection.designRooms.reduce<
+      Record<string, (DesignComponent & { roomName: string })[]>
+    >((groups, room) => {
+      groups[room.name] = room.designComponents.map((comp) => ({
+        ...comp,
+        roomName: room.name,
+      }))
+      return groups
+    }, {})
+    sortedGroups = selection.designRooms.map((room) => room.name)
+  } else {
+    // Group by category
+    groupedData = allComponents.reduce<
+      Record<string, (DesignComponent & { roomName: string })[]>
+    >((groups, component) => {
+      const categoryName =
+        component.material?.category?.name || component.componentType || "Other"
+      if (!groups[categoryName]) {
+        groups[categoryName] = []
+      }
+      groups[categoryName].push(component)
+      return groups
+    }, {})
+    sortedGroups = Object.keys(groupedData).sort()
   }
 
   return (
@@ -125,186 +181,192 @@ export default function SelectionPDFContent({
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         color: "#1f2937",
-        lineHeight: 1.6,
+        lineHeight: 1.35,
+        fontSize: "8pt",
       }}
     >
-
       {/* PDF Header */}
       <div className="pdf-header">
-        <div className="pdf-title">Selection Report</div>
-        <div className="pdf-subtitle">{selection.name}</div>
-        <div className="pdf-meta">
+        <div className="pdf-header-main">
           <div>
-            <strong>Community:</strong> {selection.unit.building.community.name}
+            <div className="pdf-eyebrow" style={{ color: accentColor }}>
+              Selection Report
+            </div>
+            <div className="pdf-title">
+              {selection.unit.building.community.name} - {selection.unit.building.name} - Unit {selection.unit.number}
+            </div>
+            <div className="pdf-subtitle">Generated {generatedAt}</div>
+          </div>
+          {selection.unit.building.community.logoUrl && (
+            <div className="pdf-logo-wrap">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={selection.unit.building.community.logoUrl}
+                alt={`${selection.unit.building.community.name} logo`}
+                className="pdf-logo-image"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="pdf-meta-grid">
+          <div>
+            <div className="pdf-meta-label">Community</div>
+            <div className="pdf-meta-value">{selection.unit.building.community.name}</div>
           </div>
           <div>
-            <strong>Building:</strong> {selection.unit.building.name}
+            <div className="pdf-meta-label">Building</div>
+            <div className="pdf-meta-value">{selection.unit.building.name}</div>
           </div>
           <div>
-            <strong>Unit:</strong> {selection.unit.number}
+            <div className="pdf-meta-label">Unit</div>
+            <div className="pdf-meta-value">{selection.unit.number}</div>
           </div>
           <div>
-            <strong>Status:</strong> {selection.status || "Draft"}
+            <div className="pdf-meta-label">Selection Date</div>
+            <div className="pdf-meta-value">
+              {new Date(selection.createdAt).toLocaleDateString()}
+            </div>
           </div>
           {selection.assessment && (
             <>
               <div>
-                <strong>Assessment Date:</strong>{" "}
-                {new Date(selection.assessment.assessedAt).toLocaleDateString()}
+                <div className="pdf-meta-label">Assessment Date</div>
+                <div className="pdf-meta-value">
+                  {new Date(selection.assessment.assessedAt).toLocaleDateString()}
+                </div>
               </div>
               <div>
-                <strong>Assessed By:</strong> {selection.assessment.assessedBy || "N/A"}
+                <div className="pdf-meta-label">Assessed By</div>
+                <div className="pdf-meta-value">{selection.assessment.assessedBy || "—"}</div>
               </div>
             </>
           )}
         </div>
       </div>
 
-      {/* Company Info */}
+      {/* Components grouped by category or room - separate table for each group */}
       <div className="pdf-section">
-        <div className="text-muted" style={{ fontSize: "0.875rem" }}>
-          <div>{companyName}</div>
-          {businessAddress && <div>{businessAddress}</div>}
-          <div style={{ marginTop: "0.5rem" }}>Generated: {generatedAt}</div>
-        </div>
-      </div>
-
-      {/* Rooms and Components */}
-      {selection.designRooms.map((room, roomIndex) => (
-        <div key={room.id} className="pdf-section">
-          <div className="room-card">
-            <div className="room-header">
-              Room {roomIndex + 1}: {room.name}
+        {sortedGroups.map((groupName) => (
+          <div key={groupName} className="pdf-group-table-wrapper">
+            {/* Group Header (Category or Room) */}
+            <div 
+              className="pdf-group-header"
+              style={{
+                backgroundColor: "#111827",
+                background: "#111827",
+                color: "white",
+                display: "block",
+              }}
+            >
+              {groupName.toUpperCase()}
             </div>
-            {room.designComponents.length > 0 ? (
-              <table className="component-table">
-                <thead>
-                  <tr>
-                    <th>Component / Type</th>
-                    <th>Catalog Item</th>
-                    <th>Upgrade</th>
-                    <th>Quantity</th>
-                    <th>Unit Cost</th>
-                    <th>Total Cost</th>
-                    <th>Condition</th>
-                    <th>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {room.designComponents.map((component) => (
-                    <tr key={component.id}>
-                      <td>
-                        <div>{component.componentType}</div>
-                        {component.componentName && (
-                          <div className="text-muted" style={{ fontSize: "0.75rem" }}>
-                            {component.componentName}
+            {/* Separate table for this group */}
+            <table className="component-table spec-table">
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th>Work Description</th>
+                  <th>Image</th>
+                  <th>Upgrade</th>
+                  <th className="quantity-cell">QTY</th>
+                  <th>Notes</th>
+                  <th>Vendor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupedData[groupName].map((component) => (
+                  <tr key={component.id}>
+                    <td>
+                      <div className="component-type-title">
+                        {component.componentName || component.componentType}
+                      </div>
+                      {component.condition && (
+                        <span
+                          className="status-pill"
+                          style={{
+                            backgroundColor: getStatusColor(component.condition, componentStatuses),
+                            color: "white",
+                            background: getStatusColor(component.condition, componentStatuses),
+                          } as React.CSSProperties}
+                        >
+                          {component.condition}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {component.material ? (
+                        <div className="component-material">
+                          <div className="component-material-title">
+                            {component.material.manufacturer ||
+                              component.material.description ||
+                              "Catalog Item"}
                           </div>
-                        )}
-                      </td>
-                      <td>
-                        {component.material ? (
-                          <div>
-                            <div style={{ fontWeight: 500 }}>
-                              {component.material.manufacturer || "N/A"}
+                          {(() => {
+                            const materialMeta = [
+                              component.material.modelNumber,
+                              component.material.finish,
+                              component.material.color,
+                            ]
+                              .filter(Boolean)
+                              .join(" • ")
+                            if (!materialMeta) return null
+                            return (
+                              <div className="component-material-meta">{materialMeta}</div>
+                            )
+                          })()}
+                          {component.material.description && (
+                            <div className="component-description">
+                              {component.material.description}
                             </div>
-                            {component.material.modelNumber && (
-                              <div className="text-muted" style={{ fontSize: "0.75rem" }}>
-                                {component.material.modelNumber}
-                              </div>
-                            )}
-                            {(component.material.finish || component.material.color) && (
-                              <div className="text-muted" style={{ fontSize: "0.75rem" }}>
-                                {[component.material.finish, component.material.color]
-                                  .filter(Boolean)
-                                  .join(" / ")}
-                              </div>
-                            )}
-                            {component.material.description && (
-                              <div className="text-muted" style={{ fontSize: "0.75rem" }}>
-                                {component.material.description}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td>
-                        {component.residentUpgrade ? (
-                          <span className="upgrade-badge">Upgrade</span>
-                        ) : (
-                          <span className="text-muted">Included</span>
-                        )}
-                      </td>
-                      <td>{component.quantity}</td>
-                      <td>{formatCurrency(component.unitCost)}</td>
-                      <td>{formatCurrency(component.totalCost)}</td>
-                      <td>
-                        {component.condition ? (
-                          <span
-                            className="status-badge"
-                            style={{
-                              backgroundColor: getStatusColor(component.condition, componentStatuses),
-                            }}
-                          >
-                            {component.condition}
-                          </span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td>
-                        {component.notes ? (
-                          <div style={{ fontSize: "0.75rem" }}>{component.notes}</div>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="text-muted">No components in this room.</div>
-            )}
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td>
+                      {component.material?.imageUrl ? (
+                        <div className="component-image-wrap">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={component.material.imageUrl}
+                            alt={component.componentName || "Catalog item image"}
+                            className="component-image"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td>
+                      {component.residentUpgrade ? (
+                        <span className="upgrade-badge">Upgrade</span>
+                      ) : (
+                        <span className="text-muted">Included</span>
+                      )}
+                    </td>
+                    <td className="quantity-cell">{component.quantity || "—"}</td>
+                    <td>
+                      <div className="component-notes-text">
+                        {component.notes || <span className="text-muted">—</span>}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="text-xs">
+                        {component.vendor?.name || <span className="text-muted">—</span>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
-      ))}
-
-      {/* Summary */}
-      <div className="summary-box">
-        <div className="pdf-section-title">Summary</div>
-        <div className="summary-row">
-          <span>Total Rooms:</span>
-          <span>{selection.designRooms.length}</span>
-        </div>
-        <div className="summary-row">
-          <span>Total Components:</span>
-          <span>
-            {selection.designRooms.reduce(
-              (sum, room) => sum + room.designComponents.length,
-              0
-            )}
-          </span>
-        </div>
-        <div className="summary-row">
-          <span>Total Cost:</span>
-          <span>{formatCurrency(totalCost)}</span>
-        </div>
+        ))}
       </div>
 
       {/* Footer */}
-      <div
-        className="print-footer"
-        style={{
-          marginTop: "3rem",
-          paddingTop: "1rem",
-          borderTop: "1px solid #e5e7eb",
-          fontSize: "0.75rem",
-          color: "#6b7280",
-          textAlign: "center",
-        }}
-      >
+      <div className="print-footer">
         <div>{companyName}</div>
         <div>Generated on {generatedAt}</div>
       </div>

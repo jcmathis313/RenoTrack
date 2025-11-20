@@ -45,6 +45,18 @@
   }
 }
 
+/* Fixed table layout for consistent column alignment */
+table.table-fixed {
+  table-layout: fixed;
+}
+
+table.table-fixed td,
+table.table-fixed th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-wrap: break-word;
+}
+
 /* Sonner toast custom styling */
 [data-sonner-toaster] {
   --width: auto;
@@ -59,16 +71,43 @@
 /* PDF Print Styles */
 @media print {
   @page {
-    size: letter;
-    margin: 0.75in;
+    size: letter landscape;
+    margin: 0.4in;
+  }
+
+  *:not(.status-pill):not(.upgrade-badge):not(.pdf-group-header):not(.pdf-header):not(.pdf-header-main) {
+    background: white !important;
+    background-color: white !important;
+  }
+
+  body {
+    overflow: visible !important;
+    height: auto !important;
+    background: white !important;
+    background-color: white !important;
   }
 
   .pdf-container {
     width: 100%;
     max-width: none;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    background-color: white !important;
   }
 
   .no-print {
+    display: none !important;
+  }
+
+  /* Hide RenoTrack dashboard header bar on PDFs - only hide navigation, not PDF content */
+  /* Target MobileHeader: header with sticky, top-0, and contains "RenoTrack" text */
+  header.sticky.top-0,
+  header.z-40.flex.h-16,
+  /* Hide sidebar navigation */
+  aside,
+  /* Hide desktop sidebar */
+  div[class*="Sidebar"] {
     display: none !important;
   }
 
@@ -79,15 +118,94 @@
   .avoid-break {
     page-break-inside: avoid;
   }
+  
+  /* Hide dashboard UI elements when printing */
+  .h-screen,
+  .overflow-hidden {
+    overflow: visible !important;
+    height: auto !important;
+    background: white !important;
+    background-color: white !important;
+  }
+
+  /* Override Tailwind gray backgrounds */
+  .bg-gray-50,
+  .bg-gray-100,
+  .bg-gray-200,
+  [class*="bg-gray"] {
+    background-color: white !important;
+  }
+
+  /* Keep specific backgrounds that should remain */
+  .component-table th {
+    background-color: #f3f4f6 !important;
+  }
+
+  /* Ensure PDF content headers are visible - override any hiding rules */
+  div.pdf-header,
+  div.pdf-header-main,
+  div.pdf-group-header,
+  .pdf-header,
+  .pdf-header-main,
+  .pdf-group-header {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .pdf-header-main {
+    display: flex !important;
+  }
+
+  .pdf-group-header {
+    background-color: #111827 !important;
+    background: #111827 !important;
+    color: white !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .component-group-row {
+    background-color: #f5f5f5 !important;
+  }
+
+  .component-notes-row {
+    background-color: #fafafa !important;
+  }
+
 }
 
 @media screen {
   .pdf-container {
-    max-width: 8.5in;
-    margin: 0 auto;
-    padding: 1in;
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: 0;
     background: white;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    min-height: 100vh;
+  }
+  
+  /* Override dashboard layout constraints for PDF pages */
+  body:has(.pdf-container) .h-screen {
+    height: auto !important;
+    min-height: 100vh;
+  }
+  
+  body:has(.pdf-container) .overflow-hidden {
+    overflow: visible !important;
+  }
+  
+  body:has(.pdf-container) main {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  
+  body:has(.pdf-container) .flex.flex-col {
+    overflow: visible !important;
+    height: auto !important;
   }
 }
 
@@ -98,17 +216,70 @@
   margin-bottom: 2rem;
 }
 
+.pdf-header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.pdf-eyebrow {
+  font-size: 8pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+  color: #6b7280;
+}
+
 .pdf-title {
-  font-size: 2rem;
+  font-size: 14pt;
   font-weight: 700;
   color: #111827;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  line-height: 1.2;
 }
 
 .pdf-subtitle {
-  font-size: 1rem;
+  font-size: 7pt;
   color: #6b7280;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
+}
+
+.pdf-logo-wrap {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pdf-logo-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.pdf-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem 1.5rem;
+  font-size: 7pt;
+  margin-top: 1rem;
+}
+
+.pdf-meta-label {
+  font-size: 7pt;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 0.125rem;
+}
+
+.pdf-meta-value {
+  font-size: 7pt;
+  color: #111827;
+  font-weight: 400;
 }
 
 .pdf-meta {
@@ -121,7 +292,6 @@
 
 .pdf-section {
   margin-bottom: 2rem;
-  page-break-inside: avoid;
 }
 
 .pdf-section-title {
@@ -138,7 +308,6 @@
   border-radius: 0.5rem;
   padding: 1.5rem;
   margin-bottom: 1.5rem;
-  page-break-inside: avoid;
 }
 
 .room-header {
@@ -153,28 +322,228 @@
 .component-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 1rem;
+  margin-top: 0;
+  page-break-inside: auto;
+  border: none;
+}
+
+.component-table thead {
+  display: table-header-group;
+}
+
+.component-table tbody {
+  display: table-row-group;
+}
+
+.component-table tr {
+  page-break-inside: avoid;
+  page-break-after: auto;
+}
+
+.component-table thead {
+  display: table-header-group;
+  page-break-after: avoid;
+}
+
+.component-table tbody {
+  display: table-row-group;
 }
 
 .component-table th {
-  background-color: #f9fafb;
-  padding: 0.75rem;
+  background-color: #f3f4f6;
+  padding: 0.5rem 0.75rem;
   text-align: left;
   font-weight: 600;
-  font-size: 0.875rem;
-  color: #374151;
-  border-bottom: 2px solid #e5e7eb;
+  font-size: 8pt;
+  color: #111827;
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .component-table td {
-  padding: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
   border-bottom: 1px solid #f3f4f6;
-  font-size: 0.875rem;
+  font-size: 8pt;
+  color: #1f2937;
+  vertical-align: top;
+}
+
+.spec-table {
+  width: 100%;
+}
+
+.spec-table th:nth-child(1) {
+  width: 10%;
+}
+
+.spec-table th:nth-child(2) {
+  width: 35%;
+}
+
+.spec-table th:nth-child(3) {
+  width: 6%;
+}
+
+.spec-table th:nth-child(4) {
+  width: 6%;
+}
+
+.spec-table th:nth-child(5) {
+  width: 5%;
+}
+
+.spec-table th:nth-child(6) {
+  width: 28%;
+}
+
+.spec-table th:nth-child(7) {
+  width: 10%;
+}
+
+.quantity-cell {
+  text-align: center;
+  width: 6%;
+}
+
+.pdf-group-table-wrapper {
+  margin-bottom: 1.5rem;
+  page-break-inside: auto;
+  page-break-after: auto;
+}
+
+.pdf-group-header {
+  page-break-after: avoid;
+  page-break-inside: avoid;
+  display: block !important;
+}
+
+.pdf-group-table-wrapper .component-table {
+  page-break-inside: auto;
+  margin-top: 0;
+}
+
+.pdf-group-header {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  font-weight: 700;
+  font-size: 8pt;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: white !important;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  margin-bottom: 0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.pdf-group-table-wrapper .component-table {
+  border: none;
+  border-top: none;
+}
+
+.component-group-row {
+  background-color: #f5f5f5;
+  font-weight: 700;
+  font-size: 8pt;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.component-group-row td {
+  padding: 0.5rem 0.75rem;
+  color: #111827;
+  border-bottom: 1px solid #e5e7eb;
+  border-top: 1px solid #e5e7eb;
+}
+
+.component-type-title {
+  font-size: 8pt;
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 0.25rem;
+}
+
+.component-material {
+  font-size: 8pt;
+}
+
+.component-material-title {
+  font-size: 8pt;
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 0.125rem;
+}
+
+.component-material-meta {
+  font-size: 7pt;
+  color: #6b7280;
+  margin-bottom: 0.125rem;
+}
+
+.component-description {
+  font-size: 7pt;
   color: #4b5563;
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+.component-image-wrap {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.component-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.component-notes-text {
+  font-size: 7pt;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+/* Legacy styles for notes row (kept in case needed elsewhere) */
+.component-notes-row {
+  background-color: #fafafa;
+}
+
+.component-notes-row td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.component-notes-label {
+  font-size: 7pt;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
 }
 
 .component-table tr:last-child td {
   border-bottom: none;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 7pt;
+  font-weight: 600;
+  color: white;
+  margin-top: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
 .status-badge {
@@ -188,12 +557,14 @@
 
 .upgrade-badge {
   display: inline-block;
-  padding: 0.25rem 0.75rem;
+  padding: 0.125rem 0.5rem;
   border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: 7pt;
+  font-weight: 600;
   background-color: #d1fae5;
   color: #065f46;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
 .summary-box {
