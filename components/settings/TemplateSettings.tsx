@@ -293,7 +293,7 @@ export function TemplateSettings() {
                             <div className="flex justify-end gap-2">
                               <Button
                                 size="sm"
-                                variant="ghost"
+                                variant="outline"
                                 onClick={() => window.location.href = `/dashboard/settings/templates/${template.id}`}
                               >
                                 Edit
@@ -303,7 +303,7 @@ export function TemplateSettings() {
                                 variant="ghost"
                                 onClick={() => handleEditTemplateStart(template)}
                               >
-                                <PencilIcon className="h-4 w-4" />
+                                <PencilIcon className="h-4 w-4" title="Rename" />
                               </Button>
                               <Button
                                 size="sm"
