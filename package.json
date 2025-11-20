@@ -7,7 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "node -e \"try { require('@sparticuz/chromium'); } catch (e) {}\"",
+    "postinstall": "node -e \"try { const chromium = require('@sparticuz/chromium'); chromium.executablePath().then(p => console.log('Chromium path:', p)).catch(e => console.warn('Chromium setup warning:', e.message)); } catch (e) { console.warn('Chromium not available:', e.message); }\"",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
