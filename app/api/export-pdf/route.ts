@@ -9,15 +9,19 @@ export const runtime = 'nodejs'
 // Increase timeout for PDF generation (Vercel default is 10s, max is 60s for Hobby, 300s for Pro)
 export const maxDuration = 60
 
-// Configure Chromium for Vercel/serverless (if available)
-// Note: setGraphicsMode may not be available in all versions
-// Using type assertion to avoid TypeScript errors
-if (typeof (chromium as any).setGraphicsMode === 'function') {
-  (chromium as any).setGraphicsMode(false)
-}
+// Configure Chromium for Vercel/serverless
+// Note: @sparticuz/chromium v141+ handles binary extraction automatically
+// We don't need to configure setGraphicsMode for v141+
 
 export async function GET(request: NextRequest) {
   let browser: any = null
+  console.log("PDF Export: Starting PDF generation...")
+  console.log("PDF Export: Environment:", {
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL: process.env.VERCEL,
+    baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
+  })
+  
   try {
     const user = await getCurrentUser()
     if (!user) {
@@ -128,27 +132,103 @@ export async function GET(request: NextRequest) {
         console.log("PDF Export: Launching browser in production mode (Vercel)")
         // Use type assertion for chromium properties that may not be in type definitions
         const chromiumAny = chromium as any
-        browser = await puppeteer.launch({
-          args: [
-            ...(chromiumAny.args || []),
-            "--hide-scrollbars",
-            "--disable-web-security",
-            "--disable-gpu",
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--single-process", // Required for serverless
-          ],
-          defaultViewport: chromiumAny.defaultViewport || { width: 1920, height: 1080 },
-          executablePath: await chromiumAny.executablePath(),
-          headless: chromiumAny.headless !== false, // Default to true if not specified
-        })
-        console.log("PDF Export: Browser launched successfully in production")
+        
+        // Set Chromium font configuration for Vercel
+        // This ensures Chromium works properly in serverless environments
+        if (chromiumAny.font) {
+          try {
+            await chromiumAny.font()
+            console.log("PDF Export: Chromium fonts initialized")
+          } catch (fontError: any) {
+            console.warn("PDF Export: Font initialization failed (continuing anyway):", fontError.message)
+          }
+        }
+        
+        // Get executable path - this will download/extract Chromium if needed
+        let executablePath: string
+        try {
+          // For @sparticuz/chromium v141+, executablePath() should handle binary extraction
+          // If it fails, it means the binaries aren't available in the deployment
+          executablePath = await chromiumAny.executablePath()
+          console.log("PDF Export: Chromium executable path obtained:", executablePath?.substring(0, 100) + "...")
+          
+          // Verify the executable actually exists
+          const fs = await import("fs")
+          if (!fs.existsSync(executablePath)) {
+            throw new Error(`Chromium executable not found at path: ${executablePath}`)
+          }
+        } catch (execPathError: any) {
+          console.error("PDF Export: Failed to get Chromium executable path:", execPathError)
+          console.error("PDF Export: Exec path error details:", {
+            message: execPathError?.message,
+            code: execPathError?.code,
+            stack: execPathError?.stack?.substring(0, 500),
+          })
+          return NextResponse.json(
+            {
+              error: "Failed to get Chromium executable path",
+              details: execPathError?.message || "Unknown error",
+              type: "CHROMIUM_EXECUTABLE_ERROR",
+              hint: "Chromium binaries may not be included in the deployment. Check that @sparticuz/chromium is installed correctly.",
+            },
+            { status: 500 }
+          )
+        }
+        
+        // Get default viewport
+        const defaultViewport = chromiumAny.defaultViewport || { width: 1920, height: 1080 }
+        console.log("PDF Export: Using viewport:", defaultViewport)
+        
+        // Get Chromium args - these are optimized for serverless
+        const chromiumArgs = chromiumAny.args || []
+        console.log("PDF Export: Chromium args count:", chromiumArgs.length)
+        
+        try {
+          browser = await puppeteer.launch({
+            args: [
+              ...chromiumArgs,
+              "--hide-scrollbars",
+              "--disable-web-security",
+              "--disable-gpu",
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-dev-shm-usage",
+              "--single-process", // Required for serverless
+              "--disable-software-rasterizer", // Reduce memory usage
+            ],
+            defaultViewport: defaultViewport,
+            executablePath: executablePath,
+            headless: chromiumAny.headless !== false, // Default to true if not specified
+          })
+          console.log("PDF Export: Browser launched successfully in production")
+        } catch (launchErr: any) {
+          console.error("PDF Export: Puppeteer launch failed:", launchErr)
+          console.error("PDF Export: Launch error details:", {
+            message: launchErr?.message,
+            code: launchErr?.code,
+            executablePath,
+            stack: launchErr?.stack,
+          })
+          throw launchErr // Re-throw to be caught by outer catch
+        }
       }
       console.log("PDF Export: Browser launched successfully")
     } catch (launchError: any) {
       console.error("PDF Export: Failed to launch browser:", launchError)
-      throw new Error(`Failed to launch browser: ${launchError?.message || "Unknown error"}`)
+      console.error("PDF Export: Launch error details:", {
+        message: launchError?.message,
+        stack: launchError?.stack,
+        code: launchError?.code,
+        name: launchError?.name,
+      })
+      return NextResponse.json(
+        {
+          error: "Failed to launch browser",
+          details: launchError?.message || "Unknown error",
+          type: "BROWSER_LAUNCH_ERROR",
+        },
+        { status: 500 }
+      )
     }
 
     let page: any = null
@@ -363,14 +443,18 @@ export async function GET(request: NextRequest) {
         browser = null
       }
       
-      return NextResponse.json(
-        {
-          error: "Failed to generate PDF",
-          details: pageError?.message || "Unknown error",
-          stack: process.env.NODE_ENV === "development" ? pageError?.stack : undefined,
-        },
-        { status: 500 }
-      )
+      const errorDetails: any = {
+        error: "Failed to generate PDF",
+        details: pageError?.message || "Unknown error",
+        type: "PDF_GENERATION_ERROR",
+      }
+      
+      // Only include stack in development or if explicitly requested
+      if (process.env.NODE_ENV === "development" || request.nextUrl.searchParams.get("debug") === "true") {
+        errorDetails.stack = pageError?.stack
+      }
+      
+      return NextResponse.json(errorDetails, { status: 500 })
     }
   } catch (error: any) {
     console.error("PDF Export: Fatal error:", error)
@@ -384,12 +468,17 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    return NextResponse.json(
-      {
-        error: "Failed to generate PDF",
-        details: error?.message || "Unknown error",
-      },
-      { status: 500 }
-    )
+    const errorDetails: any = {
+      error: "Failed to generate PDF",
+      details: error?.message || "Unknown error",
+      type: "FATAL_ERROR",
+    }
+    
+    // Only include stack in development or if explicitly requested
+    if (process.env.NODE_ENV === "development" || request.nextUrl.searchParams.get("debug") === "true") {
+      errorDetails.stack = error?.stack
+    }
+    
+    return NextResponse.json(errorDetails, { status: 500 })
   }
 }

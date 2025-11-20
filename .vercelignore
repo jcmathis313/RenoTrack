@@ -1,0 +1,7 @@
+# Don't ignore chromium binaries - they need to be included
+!.vercelignore
+node_modules/.cache
+node_modules/.bin
+*.log
+.DS_Store
+
