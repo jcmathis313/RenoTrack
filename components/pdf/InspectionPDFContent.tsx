@@ -335,27 +335,43 @@ export default function InspectionPDFContent({
                         )}
                       </td>
                       <td>
-                        {component.imageUrl ? (
-                          <div className="component-image-wrap">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={component.imageUrl}
-                              alt={component.componentName || "Inspection image"}
-                              className="component-image"
-                            />
-                          </div>
-                        ) : component.designComponent?.catalogItem?.imageUrl ? (
-                          <div className="component-image-wrap">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={component.designComponent.catalogItem.imageUrl}
-                              alt={component.componentName || "Catalog item image"}
-                              className="component-image"
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
+                        {(() => {
+                          // Convert relative URLs to absolute URLs for images
+                          let imageSrc = null
+                          if (component.imageUrl) {
+                            imageSrc = component.imageUrl.startsWith("http")
+                              ? component.imageUrl
+                              : component.imageUrl.startsWith("/uploads")
+                              ? typeof window !== "undefined"
+                                ? `${window.location.origin}${component.imageUrl}`
+                                : component.imageUrl
+                              : component.imageUrl
+                          } else if (component.designComponent?.catalogItem?.imageUrl) {
+                            imageSrc = component.designComponent.catalogItem.imageUrl.startsWith("http")
+                              ? component.designComponent.catalogItem.imageUrl
+                              : component.designComponent.catalogItem.imageUrl
+                          }
+
+                          if (imageSrc) {
+                            return (
+                              <div className="component-image-wrap">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={imageSrc}
+                                  alt={component.componentName || "Inspection image"}
+                                  className="component-image"
+                                  onError={(e) => {
+                                    // Hide image if it fails to load
+                                    if (e.currentTarget.parentElement) {
+                                      e.currentTarget.parentElement.style.display = "none"
+                                    }
+                                  }}
+                                />
+                              </div>
+                            )
+                          }
+                          return <span className="text-muted">—</span>
+                        })()}
                       </td>
                       <td>
                         {component.status ? (

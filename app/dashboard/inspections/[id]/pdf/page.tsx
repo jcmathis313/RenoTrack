@@ -204,13 +204,21 @@ export default async function InspectionPDFPage({ params }: PageProps) {
               ? catalogItems.find((item) => item.id === designComponent.materialId) || null
               : null
 
+            // Convert relative image URLs to absolute URLs for PDF rendering
+            let imageUrl = inspectionComponent.imageUrl
+            if (imageUrl && imageUrl.startsWith("/uploads")) {
+              // Convert relative path to absolute URL
+              const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"
+              imageUrl = `${baseUrl}${imageUrl}`
+            }
+
             return {
               id: inspectionComponent.id,
               componentType: inspectionComponent.componentType,
               componentName: inspectionComponent.componentName,
               status: inspectionComponent.status,
               notes: inspectionComponent.notes,
-              imageUrl: inspectionComponent.imageUrl,
+              imageUrl: imageUrl,
               designComponent: designComponent
                 ? {
                     condition: designComponent.condition || null,

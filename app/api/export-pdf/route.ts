@@ -193,23 +193,35 @@ export async function GET(request: NextRequest) {
         throw new Error(`PDF content not found: ${selectorError.message}`)
       })
 
-      // Wait for all images to load
+      // Wait for all images to load - with better error handling
       await page.evaluate(() => {
-        return Promise.all(
+        return Promise.allSettled(
           Array.from(document.images)
             .filter((img) => !img.complete)
             .map(
               (img) =>
                 new Promise((resolve, reject) => {
                   img.onload = resolve
-                  img.onerror = reject
+                  img.onerror = () => {
+                    // Hide broken images instead of failing
+                    img.style.display = "none"
+                    resolve("Image failed to load, hidden")
+                  }
                   // Timeout after 5 seconds
-                  setTimeout(() => reject(new Error("Image load timeout")), 5000)
+                  setTimeout(() => {
+                    img.style.display = "none"
+                    resolve("Image load timeout, hidden")
+                  }, 5000)
                 })
             )
         )
+      }).then((results) => {
+        const failed = results.filter((r) => r.status === "rejected").length
+        if (failed > 0) {
+          console.log(`PDF Export: ${failed} image(s) failed to load, continuing anyway...`)
+        }
       }).catch(() => {
-        console.log("Some images may not have loaded, continuing anyway...")
+        console.log("PDF Export: Error waiting for images, continuing anyway...")
       })
 
       // Wait a bit more for any dynamic content to render
