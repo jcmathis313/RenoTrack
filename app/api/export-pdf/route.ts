@@ -329,6 +329,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Wait for all images to load - with better error handling
+      console.log("PDF Export: Waiting for images to load...")
       await page.evaluate(() => {
         return Promise.allSettled(
           Array.from(document.images)
@@ -359,14 +360,37 @@ export async function GET(request: NextRequest) {
         console.log("PDF Export: Error waiting for images, continuing anyway...")
       })
 
-      // Wait a bit more for any dynamic content to render
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Wait for CSS to be fully applied and fonts to load
+      console.log("PDF Export: Waiting for CSS and fonts to load...")
+      await page.evaluate(() => {
+        return document.fonts.ready
+      }).catch(() => {
+        console.log("PDF Export: Font loading check failed, continuing...")
+      })
       
-      // Ensure the page height is calculated correctly
+      // Wait a bit more for any dynamic content to render
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      
+      // Ensure the page height is calculated correctly and force reflow
+      console.log("PDF Export: Ensuring layout is correct...")
       await page.evaluate(() => {
         // Force layout recalculation
         document.body.style.height = 'auto'
         document.body.style.minHeight = '100vh'
+        
+        // Trigger a reflow to ensure all styles are applied
+        const container = document.querySelector('.pdf-container')
+        if (container) {
+          container.offsetHeight // Force reflow
+        }
+        
+        // Ensure all tables are visible
+        const tables = document.querySelectorAll('table')
+        tables.forEach((table) => {
+          const htmlTable = table as HTMLElement
+          htmlTable.style.display = 'table'
+          htmlTable.style.visibility = 'visible'
+        })
       })
 
       console.log("PDF Export: Generating PDF...")
