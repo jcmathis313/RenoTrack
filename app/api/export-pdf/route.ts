@@ -126,9 +126,11 @@ export async function GET(request: NextRequest) {
       } else {
         // Production (Vercel): Use @sparticuz/chromium
         console.log("PDF Export: Launching browser in production mode (Vercel)")
+        // Use type assertion for chromium properties that may not be in type definitions
+        const chromiumAny = chromium as any
         browser = await puppeteer.launch({
           args: [
-            ...chromium.args,
+            ...(chromiumAny.args || []),
             "--hide-scrollbars",
             "--disable-web-security",
             "--disable-gpu",
@@ -137,9 +139,9 @@ export async function GET(request: NextRequest) {
             "--disable-dev-shm-usage",
             "--single-process", // Required for serverless
           ],
-          defaultViewport: chromium.defaultViewport,
-          executablePath: await chromium.executablePath(),
-          headless: chromium.headless,
+          defaultViewport: chromiumAny.defaultViewport || { width: 1920, height: 1080 },
+          executablePath: await chromiumAny.executablePath(),
+          headless: chromiumAny.headless !== false, // Default to true if not specified
         })
         console.log("PDF Export: Browser launched successfully in production")
       }
