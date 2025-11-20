@@ -253,3 +253,62 @@ export async function PUT(
   }
 }
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  try {
+    const resolvedParams = await Promise.resolve(params)
+    const { id } = resolvedParams
+    
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Verify inspection belongs to user's tenant
+    const inspection = await prisma.inspection.findFirst({
+      where: {
+        id,
+        designProject: {
+          unit: {
+            building: {
+              community: {
+                tenantId: user.tenantId,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!inspection) {
+      return NextResponse.json(
+        { error: "Inspection not found or access denied" },
+        { status: 404 }
+      )
+    }
+
+    // Delete inspection (cascade will delete rooms and components)
+    await prisma.inspection.delete({
+      where: { id },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error("Error deleting inspection:", error)
+    console.error("Error details:", {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack,
+    })
+    return NextResponse.json(
+      { 
+        error: "Failed to delete inspection",
+        details: error?.message || "Unknown error"
+      },
+      { status: 500 }
+    )
+  }
+}
+
