@@ -134,15 +134,9 @@ export async function GET(request: NextRequest) {
         const chromiumAny = chromium as any
         
         // Set Chromium font configuration for Vercel
-        // This ensures Chromium works properly in serverless environments
-        if (chromiumAny.font) {
-          try {
-            await chromiumAny.font()
-            console.log("PDF Export: Chromium fonts initialized")
-          } catch (fontError: any) {
-            console.warn("PDF Export: Font initialization failed (continuing anyway):", fontError.message)
-          }
-        }
+        // Note: @sparticuz/chromium v141+ handles fonts automatically
+        // The font() method may not be available or may cause errors
+        // Skip font initialization to avoid errors
         
         // Get executable path - this will download/extract Chromium if needed
         let executablePath: string
@@ -399,7 +393,8 @@ export async function GET(request: NextRequest) {
       })
 
       // Wait for CSS to be fully applied and fonts to load
-      console.log("PDF Export: Waiting for CSS and fonts to load...")
+      console.log("PDF Export: [STEP 1] Waiting for CSS and fonts to load...")
+      console.log("PDF Export: [STEP 1] Current URL:", page.url())
       try {
         // Wait for all fonts to be loaded and ensure text is visible
         await page.evaluate(async () => {
@@ -494,16 +489,36 @@ export async function GET(request: NextRequest) {
             }
           }
         })
-        console.log("PDF Export: Fonts and CSS loaded, text visibility ensured")
+        console.log("PDF Export: [STEP 1] Fonts and CSS loaded, text visibility ensured")
+        
+        // Verify text is actually visible by checking a sample
+        const sampleText = await page.evaluate(() => {
+          const container = document.querySelector('.pdf-container')
+          if (!container) return { found: false, sample: null, textLength: 0 }
+          
+          const allText = container.textContent || ''
+          const first100Chars = allText.substring(0, 100)
+          return {
+            found: true,
+            sample: first100Chars,
+            textLength: allText.length,
+            hasTables: container.querySelectorAll('table').length > 0
+          }
+        })
+        
+        console.log("PDF Export: [STEP 1] Text verification:", JSON.stringify(sampleText))
+        
       } catch (fontError: unknown) {
-        console.warn("PDF Export: Font/visibility check failed, but continuing:", fontError)
+        const errorMsg = fontError instanceof Error ? fontError.message : String(fontError)
+        console.warn("PDF Export: [STEP 1] Font/visibility check failed, but continuing:", errorMsg)
       }
       
       // Wait a bit more for any dynamic content to render
+      console.log("PDF Export: [STEP 2] Waiting for final rendering...")
       await new Promise((resolve) => setTimeout(resolve, 3000))
       
       // Ensure the page height is calculated correctly and force reflow
-      console.log("PDF Export: Ensuring layout is correct...")
+      console.log("PDF Export: [STEP 3] Ensuring layout is correct...")
       await page.evaluate(() => {
         // Force layout recalculation
         document.body.style.height = 'auto'
@@ -525,7 +540,7 @@ export async function GET(request: NextRequest) {
         })
       })
 
-      console.log("PDF Export: Generating PDF...")
+      console.log("PDF Export: [STEP 4] Generating PDF...")
       
       // Ensure print CSS is used
       await page.emulateMediaType("print")
