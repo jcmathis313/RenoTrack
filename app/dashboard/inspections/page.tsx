@@ -208,7 +208,7 @@ export default function InspectionsPage() {
                         onClick={() => router.push(`/dashboard/inspections/${inspection.id}`)}
                       >
                         <TableCell className="font-medium">
-                          {inspection.designProject.name}
+                          Inspection for Unit {inspection.designProject.unit.number}
                         </TableCell>
                         <TableCell>
                           {inspection.designProject.unit.building.community.name}

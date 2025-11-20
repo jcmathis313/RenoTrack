@@ -22,8 +22,9 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="assessments">Assessments</TabsTrigger>
-          <TabsTrigger value="units">Units</TabsTrigger>
+          <TabsTrigger value="units">Rooms</TabsTrigger>
           <TabsTrigger value="components">Components</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="inspections">Inspections</TabsTrigger>
           <TabsTrigger value="vendors">Vendors</TabsTrigger>
         </TabsList>
@@ -42,6 +43,22 @@ export default function SettingsPage() {
 
         <TabsContent value="components" className="space-y-4">
           <ComponentSettings />
+        </TabsContent>
+
+        <TabsContent value="templates" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Templates</CardTitle>
+              <CardDescription>
+                Manage room and component templates
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500">
+                Template management will be available soon.
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="inspections" className="space-y-4">

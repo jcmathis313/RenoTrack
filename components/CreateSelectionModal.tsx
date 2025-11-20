@@ -238,21 +238,6 @@ export function CreateSelectionModal({
           {createMode === "assessment" ? (
             <>
               <div className="space-y-2">
-                <Label htmlFor="assessment-search">Search Assessment</Label>
-                <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <Input
-                    id="assessment-search"
-                    type="text"
-                    placeholder="Search by unit, building, community, or assessor..."
-                    value={assessmentSearch}
-                    onChange={(e) => setAssessmentSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="assessment">Select Assessment *</Label>
                 <Select
                   value={formData.assessmentId}
@@ -264,6 +249,20 @@ export function CreateSelectionModal({
                     <SelectValue placeholder="Select an assessment" />
                   </SelectTrigger>
                   <SelectContent>
+                    <div className="sticky top-0 z-10 bg-white p-2 border-b">
+                      <div className="relative">
+                        <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          type="text"
+                          placeholder="Search by unit, building, community, or assessor..."
+                          value={assessmentSearch}
+                          onChange={(e) => setAssessmentSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onFocus={(e) => e.stopPropagation()}
+                          className="pl-8 h-9"
+                        />
+                      </div>
+                    </div>
                     {filteredAssessments.length === 0 ? (
                       <div className="p-2 text-sm text-gray-500">
                         {assessmentSearch
