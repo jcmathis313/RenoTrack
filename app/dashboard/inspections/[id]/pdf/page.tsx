@@ -220,7 +220,8 @@ export default async function InspectionPDFPage({ params }: PageProps) {
             let imageUrl = inspectionComponent.imageUrl
             if (imageUrl && imageUrl.startsWith("/uploads") && !imageUrl.startsWith("http")) {
               // Legacy local file path - convert to absolute URL for PDF rendering
-              const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"
+              // Use the request origin if available, otherwise fallback to environment variables
+              const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || "http://localhost:3002"
               imageUrl = `${baseUrl}${imageUrl}`
             }
             // Supabase Storage URLs are already absolute (https://...), so no conversion needed
