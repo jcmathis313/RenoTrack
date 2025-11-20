@@ -129,11 +129,22 @@ export default async function InspectionPDFPage({ params }: PageProps) {
       )
     }
 
+    // Validate required nested data
+    if (!inspection.designProject.unit?.building?.community) {
+      console.error("InspectionPDFPage: Missing community data", { inspectionId })
+      return (
+        <div style={{ padding: "2rem", textAlign: "center" }}>
+          <h1>Data Incomplete</h1>
+          <p>This inspection is missing required community or building information.</p>
+        </div>
+      )
+    }
+
     // Match inspection components with design components to get catalog items
-    const materialIds = inspection.designProject?.designRooms
-      ?.flatMap((room) => room.designComponents || [])
-      ?.map((comp) => comp.materialId)
-      ?.filter((id): id is string => id !== null) || []
+    const materialIds = (inspection.designProject?.designRooms || [])
+      .flatMap((room) => room.designComponents || [])
+      .map((comp) => comp.materialId)
+      .filter((id): id is string => id !== null && id !== undefined)
 
     const catalogItems = materialIds.length > 0
       ? await prisma.catalogItem.findMany({
@@ -181,8 +192,8 @@ export default async function InspectionPDFPage({ params }: PageProps) {
           },
         },
       },
-      inspectionRooms: inspection.inspectionRooms.map((inspectionRoom) => {
-        const designRoom = inspection.designProject?.designRooms?.find(
+      inspectionRooms: (inspection.inspectionRooms || []).map((inspectionRoom) => {
+        const designRoom = (inspection.designProject?.designRooms || []).find(
           (dr) => dr.name === inspectionRoom.name
         )
 
@@ -192,8 +203,8 @@ export default async function InspectionPDFPage({ params }: PageProps) {
           type: inspectionRoom.type,
           status: inspectionRoom.status,
           order: inspectionRoom.order,
-          inspectionComponents: inspectionRoom.inspectionComponents.map((inspectionComponent) => {
-            const designComponent = designRoom?.designComponents?.find(
+          inspectionComponents: (inspectionRoom.inspectionComponents || []).map((inspectionComponent) => {
+            const designComponent = (designRoom?.designComponents || []).find(
               (dc) =>
                 dc.componentType === inspectionComponent.componentType &&
                 (dc.componentName === inspectionComponent.componentName ||
