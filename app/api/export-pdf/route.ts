@@ -7,8 +7,11 @@ import chromium from "@sparticuz/chromium"
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-// Configure Chromium for Vercel/serverless
-chromium.setGraphicsMode(false)
+// Configure Chromium for Vercel/serverless (if available)
+// Note: setGraphicsMode may not be available in all versions
+if (typeof chromium.setGraphicsMode === 'function') {
+  chromium.setGraphicsMode(false)
+}
 
 export async function GET(request: NextRequest) {
   let browser: any = null
