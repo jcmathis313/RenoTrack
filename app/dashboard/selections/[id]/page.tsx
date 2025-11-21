@@ -1196,8 +1196,18 @@ export default function SelectionDetailPage() {
 
       {selection.designRooms.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-gray-500">No rooms yet. Add your first room to get started.</p>
+          <CardContent className="py-12 text-center space-y-4">
+            <p className="text-gray-500">No rooms yet. Import a template or add your first room to get started.</p>
+            <div className="flex justify-center gap-2">
+              <Button onClick={() => setImportTemplateOpen(true)}>
+                <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
+                Import Template
+              </Button>
+              <Button variant="outline" onClick={() => setAddRoomOpen(true)}>
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Add New Room
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
