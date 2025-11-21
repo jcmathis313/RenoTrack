@@ -667,14 +667,14 @@ export default function TemplateDetailPage() {
                             </TableCell>
                             <TableCell>
                               {editingComponentId === component.id ? (
-                                <Select
-                                  value={editingComponent?.condition || undefined}
-                                  onValueChange={(value) => editingComponent && setEditingComponent({ ...editingComponent, condition: value })}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue placeholder="Condition" />
-                                  </SelectTrigger>
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <Select
+                                    value={editingComponent?.condition || undefined}
+                                    onValueChange={(value) => editingComponent && setEditingComponent({ ...editingComponent, condition: value })}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue placeholder="Condition" />
+                                    </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="">None</SelectItem>
                                     {componentStatuses.map((status) => {
@@ -698,7 +698,8 @@ export default function TemplateDetailPage() {
                                       )
                                     })}
                                   </SelectContent>
-                                </Select>
+                                  </Select>
+                                </div>
                               ) : (
                                 component.condition ? (
                                   (() => {
@@ -783,23 +784,24 @@ export default function TemplateDetailPage() {
                             </TableCell>
                             <TableCell>
                               {editingComponentId === component.id ? (
-                                <Select
-                                  value={editingComponent?.vendorId || undefined}
-                                  onValueChange={(value) => editingComponent && setEditingComponent({ ...editingComponent, vendorId: value === "__none__" ? null : value || null })}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue placeholder="Vendor" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__none__">None</SelectItem>
-                                    {vendors.map((vendor) => (
-                                      <SelectItem key={vendor.id} value={vendor.id}>
-                                        {vendor.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <Select
+                                    value={editingComponent?.vendorId || undefined}
+                                    onValueChange={(value) => editingComponent && setEditingComponent({ ...editingComponent, vendorId: value === "__none__" ? null : value || null })}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue placeholder="Vendor" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">None</SelectItem>
+                                      {vendors.map((vendor) => (
+                                        <SelectItem key={vendor.id} value={vendor.id}>
+                                          {vendor.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               ) : (
                                 <div className="text-xs">
                                   {(() => {
