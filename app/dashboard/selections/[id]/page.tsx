@@ -781,39 +781,48 @@ export default function SelectionDetailPage() {
             Selection Meeting Details
           </p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              disabled={exportingPDF}
-            >
-              {exportingPDF ? (
-                <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-              )}
-              {exportingPDF ? "Generating PDF..." : "Export PDF"}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              disabled={exportingPDF}
-              onClick={async () => {
-                await handleExportPDF("rooms")
-              }}
-            >
-              Grouped by Room
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={exportingPDF}
-              onClick={async () => {
-                await handleExportPDF("categories")
-              }}
-            >
-              Grouped by Category
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setImportTemplateOpen(true)}
+          >
+            <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
+            Import Template
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={exportingPDF}
+              >
+                {exportingPDF ? (
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+                )}
+                {exportingPDF ? "Generating PDF..." : "Export PDF"}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={exportingPDF}
+                onClick={async () => {
+                  await handleExportPDF("rooms")
+                }}
+              >
+                Grouped by Room
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={exportingPDF}
+                onClick={async () => {
+                  await handleExportPDF("categories")
+                }}
+              >
+                Grouped by Category
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <Card>
