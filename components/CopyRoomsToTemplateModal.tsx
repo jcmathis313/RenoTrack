@@ -128,8 +128,8 @@ export function CopyRoomsToTemplateModal({
 
   const availableRooms = selectedSource
     ? sourceType === "selection"
-      ? selectedSource.designRooms
-      : selectedSource.rooms
+      ? (selectedSource as Selection).designRooms
+      : (selectedSource as Assessment).rooms
     : []
 
   const filteredSources = sourceType === "selection" ? selections : assessments
@@ -317,9 +317,14 @@ export function CopyRoomsToTemplateModal({
               </div>
               <div className="border rounded-md max-h-60 overflow-y-auto">
                 {availableRooms.map((room) => {
-                  const componentCount = sourceType === "selection"
-                    ? (room as Selection["designRooms"][0]).designComponents.length
-                    : (room as Assessment["rooms"][0]).componentAssessments.length
+                  let componentCount = 0
+                  if (sourceType === "selection") {
+                    const designRoom = room as Selection["designRooms"][0]
+                    componentCount = designRoom.designComponents?.length || 0
+                  } else {
+                    const assessmentRoom = room as Assessment["rooms"][0]
+                    componentCount = assessmentRoom.componentAssessments?.length || 0
+                  }
                   
                   return (
                     <div
