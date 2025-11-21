@@ -36,6 +36,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(templates)
   } catch (error: any) {
     console.error("Error fetching templates:", error)
+    
+    // If table doesn't exist, return empty array instead of error
+    if (error?.message?.includes("does not exist") || error?.code === "P2021" || error?.code === "42P01") {
+      console.warn("Template table does not exist in database. Returning empty array.")
+      return NextResponse.json([])
+    }
+    
     return NextResponse.json(
       { error: "Failed to fetch templates" },
       { status: 500 }
@@ -108,6 +115,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(template, { status: 201 })
   } catch (error: any) {
     console.error("Error creating template:", error)
+    
+    // Check if table doesn't exist
+    if (error?.message?.includes("does not exist") || error?.code === "P2021" || error?.code === "42P01") {
+      return NextResponse.json(
+        { error: "Template table does not exist in database. Please run the SQL migration script in Supabase." },
+        { status: 503 }
+      )
+    }
     
     if (error.code === "P2002") {
       return NextResponse.json(

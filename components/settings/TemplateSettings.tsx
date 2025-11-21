@@ -73,10 +73,18 @@ export function TemplateSettings() {
       if (response.ok) {
         const data = await response.json()
         setTemplates(data)
+      } else {
+        // Handle case where template tables don't exist yet
+        if (response.status === 500) {
+          console.warn("Template tables may not exist in database yet")
+          setError("Template tables not found. Please run the SQL migration in Supabase.")
+        } else {
+          setError("Failed to load templates")
+        }
       }
     } catch (error) {
       console.error("Error fetching templates:", error)
-      setError("Failed to load templates")
+      setError("Failed to load templates. Template tables may not exist in database.")
     } finally {
       setLoading(false)
     }
