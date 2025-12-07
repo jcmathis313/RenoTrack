@@ -32,13 +32,6 @@ interface Unit {
   }
 }
 
-interface User {
-  id: string
-  name: string | null
-  email: string
-  role: string
-}
-
 interface CreateAssessmentModalProps {
   open: boolean
   onClose: () => void
@@ -53,14 +46,12 @@ export function CreateAssessmentModal({
   initialUnitId,
 }: CreateAssessmentModalProps) {
   const [units, setUnits] = useState<Unit[]>([])
-  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
   const [formData, setFormData] = useState({
     unitId: initialUnitId || "",
-    assessedBy: undefined as string | undefined,
     assessedAt: new Date().toISOString().split("T")[0],
   })
 
@@ -76,19 +67,11 @@ export function CreateAssessmentModal({
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [unitsResponse, usersResponse] = await Promise.all([
-        fetch("/api/units"),
-        fetch("/api/users"),
-      ])
+      const unitsResponse = await fetch("/api/units")
 
       if (unitsResponse.ok) {
         const unitsData = await unitsResponse.json()
         setUnits(unitsData)
-      }
-
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json()
-        setUsers(usersData)
       }
     } catch (error) {
       console.error("Error fetching data:", error)
@@ -111,7 +94,6 @@ export function CreateAssessmentModal({
         },
         body: JSON.stringify({
           unitId: formData.unitId,
-          assessedBy: formData.assessedBy || null,
           assessedAt: formData.assessedAt || new Date().toISOString(),
         }),
       })
@@ -168,38 +150,6 @@ export function CreateAssessmentModal({
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="assessedBy">Assessed By (Optional)</Label>
-              <Select
-                value={formData.assessedBy || undefined}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, assessedBy: value })
-                }
-                disabled={loading}
-              >
-                <SelectTrigger id="assessedBy">
-                  <SelectValue placeholder="Select a user (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name || user.email} ({user.role})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formData.assessedBy && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-xs"
-                  onClick={() => setFormData({ ...formData, assessedBy: undefined })}
-                >
-                  Clear selection
-                </Button>
-              )}
-            </div>
 
             <div className="space-y-2">
               <Label htmlFor="assessedAt">Assessment Date *</Label>

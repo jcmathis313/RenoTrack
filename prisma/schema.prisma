@@ -39,6 +39,7 @@ model User {
   password        String
   name            String?
   phone           String?
+  jobTitle        String?
   profilePictureUrl String?
   role            String // "Admin" | "Project Manager" | "Technician" | "Designer"
   tenantId        String

@@ -135,10 +135,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get current user's name for assessedBy
+    const currentUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { name: true, email: true },
+    })
+    const assessedByName = currentUser?.name || currentUser?.email || user.email
+
     const assessment = await prisma.assessment.create({
       data: {
         unitId,
-        assessedBy: assessedBy || null,
+        assessedBy: assessedByName,
         assessedAt: assessedAt ? new Date(assessedAt) : new Date(),
       },
       include: {

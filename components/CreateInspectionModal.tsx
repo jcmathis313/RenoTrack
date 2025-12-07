@@ -56,7 +56,6 @@ export function CreateInspectionModal({
 
   const [formData, setFormData] = useState({
     designProjectId: "",
-    inspectedBy: "",
   })
 
   useEffect(() => {
@@ -64,7 +63,6 @@ export function CreateInspectionModal({
       fetchCompleteSelections()
       setFormData({
         designProjectId: "",
-        inspectedBy: "",
       })
       setSearchTerm("")
       setError("")
@@ -142,18 +140,6 @@ export function CreateInspectionModal({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="inspectedBy">Inspected By (Optional)</Label>
-              <Input
-                id="inspectedBy"
-                value={formData.inspectedBy}
-                onChange={(e) =>
-                  setFormData({ ...formData, inspectedBy: e.target.value })
-                }
-                placeholder="Inspector name"
-              />
-            </div>
-
             <div className="grid gap-2">
               <Label htmlFor="selection">Select Complete Selection *</Label>
               <div className="relative">

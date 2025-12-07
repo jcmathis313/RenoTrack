@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { designProjectId, inspectedBy } = body
+    const { designProjectId } = body
 
     if (!designProjectId) {
       return NextResponse.json(
@@ -151,6 +151,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Get current user's name for inspectedBy
+    const currentUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { name: true, email: true },
+    })
+    const inspectedByName = currentUser?.name || currentUser?.email || user.email
 
     // Verify design project belongs to user's tenant and is complete
     const designProject = await prisma.designProject.findFirst({
@@ -192,14 +199,14 @@ export async function POST(request: NextRequest) {
     const inspection = await prisma.inspection.create({
       data: {
         designProjectId,
-        inspectedBy: inspectedBy || null,
+        inspectedBy: inspectedByName,
         inspectionRooms: {
-          create: designProject.designRooms.map((room, roomIndex) => ({
+          create: designProject.designRooms.map((room: any, roomIndex: number) => ({
             name: room.name,
             type: room.type || null,
             order: roomIndex,
             inspectionComponents: {
-              create: room.designComponents.map((component) => ({
+              create: room.designComponents.map((component: any) => ({
                 componentType: component.componentType,
                 componentName: component.componentName || null,
                 status: null, // Start with no status

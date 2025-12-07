@@ -35,7 +35,6 @@ interface User {
   id: string
   name: string | null
   email: string
-  phone: string | null
   role: string
   profilePictureUrl: string | null
   createdAt: string
@@ -50,7 +49,6 @@ export function UsersTable() {
     name: "",
     email: "",
     password: "",
-    phone: "",
     role: "",
   })
   const [error, setError] = useState("")
@@ -93,7 +91,6 @@ export function UsersTable() {
           name: "",
           email: "",
           password: "",
-          phone: "",
           role: "",
         })
         setDialogOpen(false)
@@ -182,19 +179,6 @@ export function UsersTable() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                      placeholder="(555) 123-4567"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
                     <Label htmlFor="role">Role *</Label>
                     <Select
                       value={formData.role}
@@ -230,7 +214,6 @@ export function UsersTable() {
                         name: "",
                         email: "",
                         password: "",
-                        phone: "",
                         role: "",
                       })
                     }}
@@ -257,7 +240,6 @@ export function UsersTable() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Created</TableHead>
               </TableRow>
@@ -284,7 +266,6 @@ export function UsersTable() {
                     </div>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.phone || "—"}</TableCell>
                   <TableCell>
                     <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">
                       {user.role}

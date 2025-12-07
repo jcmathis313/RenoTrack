@@ -7,6 +7,7 @@ declare module "next-auth" {
     role: string
     tenantId: string
     tenantSlug: string
+    isSuperAdmin?: boolean
   }
 
   interface Session {
@@ -17,6 +18,7 @@ declare module "next-auth" {
       role: string
       tenantId: string
       tenantSlug: string
+      isSuperAdmin?: boolean
     }
   }
 }
@@ -27,5 +29,6 @@ declare module "next-auth/jwt" {
     role: string
     tenantId: string
     tenantSlug: string
+    isSuperAdmin?: boolean
   }
 }

@@ -11,6 +11,7 @@ interface UserData {
   email: string
   name: string | null
   phone: string | null
+  jobTitle: string | null
   profilePictureUrl: string | null
   role: string
 }
@@ -21,8 +22,9 @@ export default function AccountSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
-    phone: "",
     email: "",
+    phone: "",
+    jobTitle: "",
     password: "",
     profilePictureUrl: "",
   })
@@ -42,8 +44,9 @@ export default function AccountSettingsPage() {
         setUserData(data)
         setFormData({
           name: data.name || "",
-          phone: data.phone || "",
           email: data.email || "",
+          phone: data.phone || "",
+          jobTitle: data.jobTitle || "",
           password: "",
           profilePictureUrl: data.profilePictureUrl || "",
         })
@@ -102,6 +105,38 @@ export default function AccountSettingsPage() {
     }
   }
 
+  const handleRemovePicture = async () => {
+    setUploadingPicture(true)
+    setMessage(null)
+
+    try {
+      const response = await fetch("/api/account/remove-profile-picture", {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        const updated = await response.json()
+        setFormData((prev) => ({ ...prev, profilePictureUrl: "" }))
+        setUserData(updated)
+        setMessage({ type: "success", text: "Profile picture removed successfully" })
+      } else {
+        let errorMessage = "Failed to remove profile picture"
+        try {
+          const error = await response.json()
+          errorMessage = error.error || error.details || errorMessage
+        } catch (e) {
+          console.error("Error parsing error response:", e)
+        }
+        setMessage({ type: "error", text: errorMessage })
+      }
+    } catch (error) {
+      console.error("Error removing profile picture:", error)
+      setMessage({ type: "error", text: "Failed to remove profile picture" })
+    } finally {
+      setUploadingPicture(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -110,8 +145,9 @@ export default function AccountSettingsPage() {
     try {
       const updateData: any = {
         name: formData.name || null,
-        phone: formData.phone || null,
         email: formData.email,
+        phone: formData.phone || null,
+        jobTitle: formData.jobTitle || null,
         // profilePictureUrl is updated separately via file upload
       }
 
@@ -201,17 +237,29 @@ export default function AccountSettingsPage() {
               </div>
               <div className="flex-1">
                 <Label htmlFor="profilePicture">Profile Picture</Label>
-                <Input
-                  id="profilePicture"
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  onChange={handleFileUpload}
-                  disabled={uploadingPicture}
-                  className="mt-1"
-                />
+                <div className="flex items-center gap-2 mt-1">
+                  <Input
+                    id="profilePicture"
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={handleFileUpload}
+                    disabled={uploadingPicture}
+                    className="flex-1"
+                  />
+                  {formData.profilePictureUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleRemovePicture}
+                      disabled={uploadingPicture}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
                 <p className="mt-1 text-xs text-gray-500">
                   Upload a profile picture (JPEG, PNG, GIF, or WebP, max 5MB)
-                  {uploadingPicture && <span className="ml-1 text-blue-600">Uploading...</span>}
+                  {uploadingPicture && <span className="ml-1 text-blue-600">Processing...</span>}
                 </p>
               </div>
             </div>
@@ -251,6 +299,19 @@ export default function AccountSettingsPage() {
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="(555) 123-4567"
+                className="mt-1"
+              />
+            </div>
+
+            {/* Job Title */}
+            <div>
+              <Label htmlFor="jobTitle">Job Title</Label>
+              <Input
+                id="jobTitle"
+                type="text"
+                value={formData.jobTitle}
+                onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
+                placeholder="e.g., Project Manager, Designer, Technician"
                 className="mt-1"
               />
             </div>

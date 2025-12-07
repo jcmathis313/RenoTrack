@@ -40,7 +40,7 @@ const topLevelNavigation = [
 ]
 
 const bottomNavigation = [
-  { name: "Account Settings", href: "/dashboard/account", icon: UserCircleIcon },
+  { name: "My Profile", href: "/dashboard/account", icon: UserCircleIcon },
   { name: "Organization Settings", href: "/dashboard/settings", icon: Cog6ToothIcon },
 ]
 

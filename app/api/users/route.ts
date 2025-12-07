@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
         id: true,
         name: true,
         email: true,
-        phone: true,
         role: true,
         profilePictureUrl: true,
         createdAt: true,
@@ -51,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, email, password, phone, role } = body
+    const { name, email, password, role } = body
 
     // Validate required fields
     if (!email || !password || !role) {
@@ -94,7 +93,6 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         name: name || null,
-        phone: phone || null,
         role,
         tenantId: user.tenantId,
       },
@@ -102,7 +100,6 @@ export async function POST(request: NextRequest) {
         id: true,
         name: true,
         email: true,
-        phone: true,
         role: true,
         profilePictureUrl: true,
         createdAt: true,
