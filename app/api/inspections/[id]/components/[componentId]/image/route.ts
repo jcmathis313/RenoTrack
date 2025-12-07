@@ -101,15 +101,34 @@ export async function POST(
     const fileBuffer = new Uint8Array(bytes)
 
     // Upload to Supabase Storage
+    // Using service role key should bypass RLS, but if it doesn't, the SQL script will fix policies
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from(STORAGE_BUCKETS.INSPECTIONS)
       .upload(filename, fileBuffer, {
         contentType: file.type,
         upsert: false, // Don't overwrite existing files
+        cacheControl: '3600', // Cache for 1 hour
       })
 
     if (uploadError) {
-      console.error("Error uploading to Supabase Storage:", uploadError)
+      console.error("Error uploading to Supabase Storage:", {
+        message: uploadError.message,
+        error: uploadError,
+      })
+      
+      // Provide helpful error message for RLS issues
+      if (uploadError.message?.includes('row-level security') || uploadError.message?.includes('policy')) {
+        return NextResponse.json(
+          { 
+            error: "Failed to upload image to storage",
+            details: uploadError.message,
+            suggestion: "Please run the SQL script in scripts/fix-supabase-storage-rls.sql to fix storage RLS policies",
+            code: "RLS_POLICY_ERROR"
+          },
+          { status: 500 }
+        )
+      }
+      
       return NextResponse.json(
         { error: "Failed to upload image to storage", details: uploadError.message },
         { status: 500 }

@@ -10,11 +10,15 @@ if (!supabaseUrl || !supabaseServiceKey) {
   )
 }
 
+// Create Supabase client with service role key
+// Service role key bypasses Row Level Security (RLS) policies
+// However, storage bucket policies may still need to be configured correctly
 export const supabase = supabaseUrl && supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
+        detectSessionInUrl: false,
       },
     })
   : null
