@@ -6,6 +6,56 @@ import { prisma } from "@/lib/prisma"
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Verify unit belongs to user's tenant and fetch with building/community info
+    const unit = await prisma.unit.findFirst({
+      where: {
+        id: params.id,
+        building: {
+          community: {
+            tenantId: user.tenantId,
+          },
+        },
+      },
+      include: {
+        building: {
+          include: {
+            community: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!unit) {
+      return NextResponse.json(
+        { error: "Unit not found" },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(unit)
+  } catch (error) {
+    console.error("Error fetching unit:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch unit" },
+      { status: 500 }
+    )
+  }
+}
 
 export async function PUT(
   request: NextRequest,

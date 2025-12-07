@@ -21,19 +21,59 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get all inspections for this tenant
-    const inspections = await prisma.inspection.findMany({
-      where: {
-        designProject: {
-          unit: {
-            building: {
-              community: {
-                tenantId: user.tenantId,
-              },
+    const { searchParams } = new URL(request.url)
+    const unitId = searchParams.get("unitId")
+
+    // Build where clause
+    const where: any = {
+      designProject: {
+        unit: {
+          building: {
+            community: {
+              tenantId: user.tenantId,
             },
           },
         },
       },
+    }
+
+    // If unitId is provided, filter by it
+    if (unitId) {
+      // Also verify unit belongs to user's tenant
+      const unit = await prisma.unit.findFirst({
+        where: {
+          id: unitId,
+          building: {
+            community: {
+              tenantId: user.tenantId,
+            },
+          },
+        },
+      })
+
+      if (!unit) {
+        return NextResponse.json(
+          { error: "Unit not found" },
+          { status: 404 }
+        )
+      }
+
+      // Update where clause to filter by unitId
+      where.designProject = {
+        unitId: unitId,
+        unit: {
+          building: {
+            community: {
+              tenantId: user.tenantId,
+            },
+          },
+        },
+      }
+    }
+
+    // Get all inspections for this tenant
+    const inspections = await prisma.inspection.findMany({
+      where,
       include: {
         designProject: {
           include: {

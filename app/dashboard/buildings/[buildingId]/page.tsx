@@ -230,7 +230,12 @@ export default function UnitsPage() {
                     {filteredUnits.map((unit) => (
                       <TableRow key={unit.id}>
                         <TableCell className="font-medium">
-                          Unit {unit.number}
+                          <Link
+                            href={`/dashboard/units/${unit.id}`}
+                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            Unit {unit.number}
+                          </Link>
                         </TableCell>
                         <TableCell>
                           <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">

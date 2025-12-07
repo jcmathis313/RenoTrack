@@ -14,17 +14,46 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get all assessments for units belonging to the user's tenant
-    const assessments = await prisma.assessment.findMany({
-      where: {
-        unit: {
+    const { searchParams } = new URL(request.url)
+    const unitId = searchParams.get("unitId")
+
+    // Build where clause
+    const where: any = {
+      unit: {
+        building: {
+          community: {
+            tenantId: user.tenantId,
+          },
+        },
+      },
+    }
+
+    // If unitId is provided, filter by it
+    if (unitId) {
+      where.unitId = unitId
+      // Also verify unit belongs to user's tenant
+      const unit = await prisma.unit.findFirst({
+        where: {
+          id: unitId,
           building: {
             community: {
               tenantId: user.tenantId,
             },
           },
         },
-      },
+      })
+
+      if (!unit) {
+        return NextResponse.json(
+          { error: "Unit not found" },
+          { status: 404 }
+        )
+      }
+    }
+
+    // Get all assessments for units belonging to the user's tenant
+    const assessments = await prisma.assessment.findMany({
+      where,
       include: {
         unit: {
           include: {

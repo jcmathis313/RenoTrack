@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { GeneralSettings } from "@/components/settings/GeneralSettings"
+import { GeneralSettingsWithUsers } from "@/components/settings/GeneralSettings"
 import { AssessmentSettings } from "@/components/settings/AssessmentSettings"
 import { UnitSettings } from "@/components/settings/UnitSettings"
 import { ComponentSettings } from "@/components/settings/ComponentSettings"
@@ -31,7 +31,7 @@ export default function SettingsPage() {
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
-          <GeneralSettings />
+          <GeneralSettingsWithUsers />
         </TabsContent>
 
         <TabsContent value="assessments" className="space-y-4">

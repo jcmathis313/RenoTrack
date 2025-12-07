@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma"
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -18,13 +17,13 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, order } = body
+    const { name, type } = body
 
-    // Verify room belongs to user's tenant
-    const room = await prisma.room.findFirst({
+    // Verify design room belongs to user's tenant
+    const designRoom = await prisma.designRoom.findFirst({
       where: {
         id: params.id,
-        assessment: {
+        designProject: {
           unit: {
             building: {
               community: {
@@ -36,31 +35,31 @@ export async function PUT(
       },
     })
 
-    if (!room) {
+    if (!designRoom) {
       return NextResponse.json(
-        { error: "Room not found or access denied" },
+        { error: "Design room not found or access denied" },
         { status: 404 }
       )
     }
 
-    const updateData: { name?: string; order?: number } = {}
+    const updateData: { name?: string; type?: string | null } = {}
     if (name !== undefined) {
       updateData.name = name.trim()
     }
-    if (order !== undefined) {
-      updateData.order = order
+    if (type !== undefined) {
+      updateData.type = type || null
     }
 
-    const updatedRoom = await prisma.room.update({
+    const updatedRoom = await prisma.designRoom.update({
       where: { id: params.id },
       data: updateData,
     })
 
     return NextResponse.json(updatedRoom)
   } catch (error: any) {
-    console.error("Error updating room:", error)
+    console.error("Error updating design room:", error)
     return NextResponse.json(
-      { error: "Failed to update room" },
+      { error: "Failed to update design room" },
       { status: 500 }
     )
   }
@@ -76,11 +75,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Verify room belongs to user's tenant
-    const room = await prisma.room.findFirst({
+    // Verify design room belongs to user's tenant
+    const designRoom = await prisma.designRoom.findFirst({
       where: {
         id: params.id,
-        assessment: {
+        designProject: {
           unit: {
             building: {
               community: {
@@ -92,23 +91,26 @@ export async function DELETE(
       },
     })
 
-    if (!room) {
+    if (!designRoom) {
       return NextResponse.json(
-        { error: "Room not found or access denied" },
+        { error: "Design room not found or access denied" },
         { status: 404 }
       )
     }
 
-    await prisma.room.delete({
+    await prisma.designRoom.delete({
       where: { id: params.id },
     })
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error("Error deleting room:", error)
+    console.error("Error deleting design room:", error)
     return NextResponse.json(
-      { error: "Failed to delete room" },
+      { error: "Failed to delete design room" },
       { status: 500 }
     )
   }
 }
+
+
+

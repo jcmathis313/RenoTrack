@@ -28,19 +28,22 @@ model Tenant {
   catalogItems        CatalogItem[]
   vendors             Vendor[]
   templates           Template[]
+  activityLogs        ActivityLog[]
 
   @@index([slug])
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String
-  password  String
-  name      String?
-  role      String // "Admin" | "Project Manager" | "Technician" | "Designer"
-  tenantId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  email           String
+  password        String
+  name            String?
+  phone           String?
+  profilePictureUrl String?
+  role            String // "Admin" | "Project Manager" | "Technician" | "Designer"
+  tenantId        String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -425,4 +428,23 @@ model TemplateComponent {
   templateRoom TemplateRoom @relation(fields: [templateRoomId], references: [id], onDelete: Cascade)
 
   @@index([templateRoomId])
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  tenantId   String
+  entityType  String   // "assessment" | "selection" | "inspection"
+  entityId   String
+  action      String   // "status_changed"
+  oldValue    String?
+  newValue    String?
+  description String
+  userId      String?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }

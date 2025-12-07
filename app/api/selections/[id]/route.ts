@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { logStatusChange } from "@/lib/activity-log"
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -153,6 +154,9 @@ export async function PUT(
       )
     }
 
+    // Get old status before update
+    const oldStatus = existing.status
+
     // Update the selection
     const updated = await prisma.designProject.update({
       where: { id: selectionId },
@@ -196,6 +200,18 @@ export async function PUT(
         },
       },
     })
+
+    // Log status change activity
+    if (status !== undefined && oldStatus !== status) {
+      await logStatusChange({
+        tenantId: user.tenantId,
+        entityType: "selection",
+        entityId: selectionId,
+        oldValue: oldStatus,
+        newValue: status || null,
+        userId: user.id,
+      })
+    }
 
     return NextResponse.json(updated)
   } catch (error: any) {

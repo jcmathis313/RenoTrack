@@ -13,8 +13,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { CreateInspectionModal } from "@/components/CreateInspectionModal"
-import { PlusIcon } from "@heroicons/react/24/outline"
+import { PlusIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
 
 interface Inspection {
   id: string
@@ -54,6 +55,7 @@ export default function InspectionsPage() {
   const [loading, setLoading] = useState(true)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [filter, setFilter] = useState<"all" | "pass" | "fail">("all")
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     fetchInspections()
@@ -96,8 +98,22 @@ export default function InspectionsPage() {
     )
   }
 
-  // Filter inspections based on component status
+  // Filter inspections based on component status and search query
   const filteredInspections = inspections.filter((inspection) => {
+    // First apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      const matchesSearch = (
+        inspection.designProject.unit.number.toLowerCase().includes(query) ||
+        inspection.designProject.unit.building.community.name.toLowerCase().includes(query) ||
+        inspection.designProject.unit.building.name.toLowerCase().includes(query) ||
+        inspection.designProject.name.toLowerCase().includes(query) ||
+        (inspection.inspectedBy && inspection.inspectedBy.toLowerCase().includes(query))
+      )
+      if (!matchesSearch) return false
+    }
+    
+    // Then apply status filter
     if (filter === "all") return true
     
     // Get all component statuses from all rooms
@@ -142,37 +158,49 @@ export default function InspectionsPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>All Inspections</CardTitle>
-              <div className="flex gap-2">
-                <Button
-                  variant={filter === "all" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilter("all")}
-                  className={cn(
-                    filter === "all" && "bg-gray-900 text-white hover:bg-gray-800"
-                  )}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={filter === "pass" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilter("pass")}
-                  className={cn(
-                    filter === "pass" && "bg-gray-900 text-white hover:bg-gray-800"
-                  )}
-                >
-                  Pass
-                </Button>
-                <Button
-                  variant={filter === "fail" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilter("fail")}
-                  className={cn(
-                    filter === "fail" && "bg-gray-900 text-white hover:bg-gray-800"
-                  )}
-                >
-                  Fail
-                </Button>
+              <div className="flex items-center gap-4">
+                <div className="relative w-64">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Search by unit, community, building..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={filter === "all" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFilter("all")}
+                    className={cn(
+                      filter === "all" && "bg-gray-900 text-white hover:bg-gray-800"
+                    )}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={filter === "pass" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFilter("pass")}
+                    className={cn(
+                      filter === "pass" && "bg-gray-900 text-white hover:bg-gray-800"
+                    )}
+                  >
+                    Pass
+                  </Button>
+                  <Button
+                    variant={filter === "fail" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFilter("fail")}
+                    className={cn(
+                      filter === "fail" && "bg-gray-900 text-white hover:bg-gray-800"
+                    )}
+                  >
+                    Fail
+                  </Button>
+                </div>
               </div>
             </div>
           </CardHeader>

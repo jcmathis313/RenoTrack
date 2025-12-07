@@ -13,7 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { CreateSelectionModal } from "@/components/CreateSelectionModal"
-import { PlusIcon } from "@heroicons/react/24/outline"
+import { PlusIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline"
+import { Input } from "@/components/ui/input"
 
 interface Selection {
   id: string
@@ -46,6 +47,7 @@ export default function SelectionsPage() {
   const [selections, setSelections] = useState<Selection[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     fetchSelections()
@@ -79,6 +81,20 @@ export default function SelectionsPage() {
     })
   }
 
+  // Filter selections based on search query
+  const filteredSelections = selections.filter((selection) => {
+    if (!searchQuery.trim()) return true
+    
+    const query = searchQuery.toLowerCase()
+    return (
+      selection.name.toLowerCase().includes(query) ||
+      selection.unit.number.toLowerCase().includes(query) ||
+      selection.unit.building.community.name.toLowerCase().includes(query) ||
+      selection.unit.building.name.toLowerCase().includes(query) ||
+      (selection.status && selection.status.toLowerCase().includes(query))
+    )
+  })
+
   if (loading) {
     return (
       <div className="text-center py-8">Loading selections...</div>
@@ -102,13 +118,31 @@ export default function SelectionsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Selection Meetings</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Selection Meetings</CardTitle>
+            <div className="relative w-64">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search by unit, community, building..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {selections.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500">
                 No selection meetings yet. Create your first one!
+              </p>
+            </div>
+          ) : filteredSelections.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">
+                No selections match your search query.
               </p>
             </div>
           ) : (
@@ -127,7 +161,7 @@ export default function SelectionsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {selections.map((selection) => (
+                  {filteredSelections.map((selection) => (
                     <TableRow 
                       key={selection.id}
                       className="cursor-pointer hover:bg-gray-50"

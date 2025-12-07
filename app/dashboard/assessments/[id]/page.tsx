@@ -30,7 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { ArrowLeftIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ArrowUpIcon, ArrowDownIcon, ArrowDownTrayIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
+import { ArrowLeftIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ArrowUpIcon, ArrowDownIcon, ArrowDownTrayIcon, ArrowPathIcon, PencilIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
 
 interface ComponentCategory {
@@ -126,6 +126,11 @@ export default function AssessmentDetailPage() {
   const [reorderingRooms, setReorderingRooms] = useState(false)
   const [savingComponent, setSavingComponent] = useState(false)
   const [deletingComponent, setDeletingComponent] = useState(false)
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
+  const [editingRoomName, setEditingRoomName] = useState("")
+  const [savingRoom, setSavingRoom] = useState(false)
+  const [deleteRoomConfirmOpen, setDeleteRoomConfirmOpen] = useState<string | null>(null)
+  const [deletingRoom, setDeletingRoom] = useState(false)
 
   useEffect(() => {
     if (assessmentId) {
@@ -660,7 +665,59 @@ export default function AssessmentDetailPage() {
             <Card key={room.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>{room.name}</CardTitle>
+                  <div className="flex items-center gap-2 flex-1">
+                    {editingRoomId === room.id ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          value={editingRoomName}
+                          onChange={(e) => setEditingRoomName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleEditRoomSave(room.id)
+                            } else if (e.key === "Escape") {
+                              handleEditRoomCancel()
+                            }
+                          }}
+                          className="h-8 text-base font-semibold"
+                          autoFocus
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleEditRoomSave(room.id)}
+                          disabled={savingRoom}
+                        >
+                          <CheckIcon className="h-4 w-4 text-green-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={handleEditRoomCancel}
+                          disabled={savingRoom}
+                        >
+                          <XMarkIcon className="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <CardTitle>{room.name}</CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEditRoomStart(room)
+                          }}
+                          title="Edit room name"
+                        >
+                          <PencilIcon className="h-4 w-4 text-gray-500" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <div className="flex flex-col gap-1">
                       <Button
@@ -690,6 +747,18 @@ export default function AssessmentDetailPage() {
                         <ArrowDownIcon className="h-4 w-4" />
                       </Button>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteRoomConfirmOpen(room.id)
+                      }}
+                      title="Delete room"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -1240,6 +1309,38 @@ export default function AssessmentDetailPage() {
               disabled={deletingComponent}
             >
               {deletingComponent ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Room Confirmation Dialog */}
+      <Dialog
+        open={deleteRoomConfirmOpen !== null}
+        onOpenChange={(open) => !open && setDeleteRoomConfirmOpen(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Room</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this room? All components in this room will also be deleted. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteRoomConfirmOpen(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => deleteRoomConfirmOpen && handleDeleteRoom(deleteRoomConfirmOpen)}
+              disabled={deletingRoom}
+            >
+              {deletingRoom ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

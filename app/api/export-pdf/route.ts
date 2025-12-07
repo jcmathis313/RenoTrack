@@ -328,13 +328,48 @@ export async function GET(request: NextRequest) {
             
             // Check if we have actual content (not just empty divs)
             const hasText = container.textContent && container.textContent.trim().length > 100
-            const hasTables = container.querySelectorAll('table').length > 0
+            const tables = container.querySelectorAll('table')
+            const hasTables = tables.length > 0
             
-            return hasText || hasTables
+            // Check that tables have rows (not just headers)
+            let hasTableRows = false
+            if (hasTables) {
+              tables.forEach((table) => {
+                const rows = table.querySelectorAll('tbody tr')
+                if (rows.length > 0) {
+                  hasTableRows = true
+                }
+              })
+            }
+            
+            return (hasText || hasTables) && hasTableRows
           },
           { timeout: 20000 }
         )
         console.log("PDF Export: Content rendered and ready")
+        
+        // Additional wait to ensure all React components are fully rendered
+        await page.waitForFunction(
+          () => {
+            const container = document.querySelector('.pdf-container')
+            if (!container) return false
+            
+            // Count all table rows across all tables
+            const tables = container.querySelectorAll('table')
+            let totalRows = 0
+            tables.forEach((table) => {
+              const rows = table.querySelectorAll('tbody tr')
+              totalRows += rows.length
+            })
+            
+            // Wait until we have at least some rows, and then wait a bit more for any lazy-loaded content
+            return totalRows > 0
+          },
+          { timeout: 10000 }
+        )
+        
+        // Wait a bit more to ensure all content is stable
+        await new Promise((resolve) => setTimeout(resolve, 1000))
         
         // Additional wait for any animations or transitions to complete
         await new Promise((resolve) => setTimeout(resolve, 2000))

@@ -51,11 +51,13 @@ async function getSelectionData(selectionId: string, tenantId: string) {
       designRooms: {
         include: {
           designComponents: {
+            // No filtering - get ALL components
             orderBy: {
               createdAt: "asc",
             },
           },
         },
+        // Order rooms consistently
         orderBy: {
           createdAt: "asc",
         },
@@ -164,14 +166,43 @@ export default async function SelectionPDFPage({ params, searchParams }: PagePro
       ...selection.assessment,
       assessedAt: selection.assessment.assessedAt.toISOString(),
     } : null,
-    designRooms: selection.designRooms.map((room) => ({
-      ...room,
-      designComponents: room.designComponents.map((comp) => ({
-        ...comp,
+    designRooms: selection.designRooms.map((room) => {
+      // Ensure we preserve ALL components - use full array, no filtering
+      const allComponents = Array.isArray(room.designComponents) ? room.designComponents : []
+      
+      // Map each component explicitly to preserve all data
+      const mappedComponents = allComponents.map((comp) => ({
+        id: comp.id,
+        componentType: comp.componentType,
+        componentName: comp.componentName,
+        condition: comp.condition,
+        materialId: comp.materialId,
+        vendorId: comp.vendorId,
+        quantity: comp.quantity,
+        unitCost: comp.unitCost,
+        totalCost: comp.totalCost,
+        residentUpgrade: comp.residentUpgrade,
+        notes: comp.notes,
+        createdAt: comp.createdAt.toISOString(),
+        updatedAt: comp.updatedAt.toISOString(),
         material: comp.materialId ? catalogMap.get(comp.materialId) || null : null,
         vendor: comp.vendorId ? vendorMap.get(comp.vendorId) || null : null,
-      })),
-    })),
+      }))
+      
+      // Verify no components were lost
+      if (mappedComponents.length !== allComponents.length) {
+        console.error(`Room: ${room.name} - Lost components during mapping. Original: ${allComponents.length}, Mapped: ${mappedComponents.length}`)
+      }
+      
+      console.log(`Room "${room.name}": ${allComponents.length} components`)
+      
+      return {
+        ...room,
+        createdAt: room.createdAt.toISOString(),
+        updatedAt: room.updatedAt.toISOString(),
+        designComponents: mappedComponents,
+      }
+    }),
   }
 
   const tenantSettings = await getTenantSettings(user.tenantId)

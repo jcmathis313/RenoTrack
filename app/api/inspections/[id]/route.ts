@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { logStatusChange } from "@/lib/activity-log"
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -227,6 +228,9 @@ export async function PUT(
       )
     }
 
+    // Get old status before update
+    const oldStatus = inspection.status
+
     // Update inspection status
     const updated = await prisma.inspection.update({
       where: { id },
@@ -234,6 +238,18 @@ export async function PUT(
         status: status || null,
       },
     })
+
+    // Log status change activity
+    if (status !== undefined && oldStatus !== status) {
+      await logStatusChange({
+        tenantId: user.tenantId,
+        entityType: "inspection",
+        entityId: id,
+        oldValue: oldStatus,
+        newValue: status || null,
+        userId: user.id,
+      })
+    }
 
     return NextResponse.json(updated)
   } catch (error: any) {

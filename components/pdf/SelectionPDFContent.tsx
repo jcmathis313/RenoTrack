@@ -137,9 +137,26 @@ export default function SelectionPDFContent({
     }).format(amount)
   }
 
-  const allComponents = selection.designRooms.flatMap((room) =>
-    room.designComponents.map((comp) => ({ ...comp, roomName: room.name }))
-  )
+  const allComponents = selection.designRooms.flatMap((room) => {
+    const roomComps = Array.isArray(room.designComponents) ? room.designComponents : []
+    // Explicitly map all fields to avoid data loss
+    return roomComps.map((comp) => ({
+      id: comp.id,
+      componentType: comp.componentType,
+      componentName: comp.componentName,
+      condition: comp.condition,
+      materialId: comp.materialId,
+      vendorId: comp.vendorId,
+      quantity: comp.quantity,
+      unitCost: comp.unitCost,
+      totalCost: comp.totalCost,
+      residentUpgrade: comp.residentUpgrade,
+      notes: comp.notes,
+      material: comp.material || null,
+      vendor: comp.vendor || null,
+      roomName: room.name,
+    }))
+  })
 
   const totalCost = allComponents.reduce((sum, comp) => sum + (comp.totalCost || 0), 0)
 
@@ -148,14 +165,39 @@ export default function SelectionPDFContent({
   let sortedGroups: string[]
 
   if (variant === "rooms") {
-    // Group by room
+    // Group by room - include ALL rooms, even if they have no components
     groupedData = selection.designRooms.reduce<
       Record<string, (DesignComponent & { roomName: string })[]>
     >((groups, room) => {
-      groups[room.name] = room.designComponents.map((comp) => ({
-        ...comp,
+      // Always create an entry for each room, even if empty
+      // Map all components explicitly to ensure nothing is lost
+      // IMPORTANT: Use the full array, don't filter anything
+      const roomComponents = Array.isArray(room.designComponents) ? room.designComponents : []
+      
+      // Map ALL components explicitly - do not filter or skip any
+      const mappedComponents = roomComponents.map((comp) => ({
+        id: comp.id,
+        componentType: comp.componentType,
+        componentName: comp.componentName,
+        condition: comp.condition,
+        materialId: comp.materialId,
+        vendorId: comp.vendorId,
+        quantity: comp.quantity,
+        unitCost: comp.unitCost,
+        totalCost: comp.totalCost,
+        residentUpgrade: comp.residentUpgrade,
+        notes: comp.notes,
+        material: comp.material || null,
+        vendor: comp.vendor || null,
         roomName: room.name,
       }))
+      
+      // Verify we didn't lose any components during mapping
+      if (mappedComponents.length !== roomComponents.length) {
+        console.error(`ERROR: Lost components during mapping! Room: ${room.name}, Original: ${roomComponents.length}, Mapped: ${mappedComponents.length}`)
+      }
+      
+      groups[room.name] = mappedComponents
       return groups
     }, {})
     sortedGroups = selection.designRooms.map((room) => room.name)
@@ -247,8 +289,23 @@ export default function SelectionPDFContent({
 
       {/* Components grouped by category or room - separate table for each group */}
       <div className="pdf-section">
-        {sortedGroups.map((groupName) => (
+        {sortedGroups.map((groupName) => {
+          const components = Array.isArray(groupedData[groupName]) ? groupedData[groupName] : []
+          
+          // Log component count per room
+          console.log(`[PDF] Room "${groupName}": ${components.length} components`, components.map(c => c.componentName || c.componentType))
+          
+          return (
           <div key={groupName} className="pdf-group-table-wrapper">
+            {/* Component count above room header */}
+            <div style={{ 
+              fontSize: '8pt', 
+              color: '#666', 
+              padding: '2px 0 4px 0',
+              textAlign: 'left'
+            }}>
+              {components.length} component{components.length !== 1 ? 's' : ''}
+            </div>
             {/* Group Header (Category or Room) */}
             <div 
               className="pdf-group-header"
@@ -262,6 +319,7 @@ export default function SelectionPDFContent({
               {groupName.toUpperCase()}
             </div>
             {/* Separate table for this group */}
+            {components.length > 0 ? (
             <table className="component-table spec-table">
               <thead>
                 <tr>
@@ -275,8 +333,8 @@ export default function SelectionPDFContent({
                 </tr>
               </thead>
               <tbody>
-                {groupedData[groupName].map((component) => (
-                  <tr key={component.id}>
+                {components.map((component, index) => (
+                  <tr key={`${groupName}-${component.id}-${index}`}>
                     <td>
                       <div className="component-type-title">
                         {component.componentName || component.componentType}
@@ -361,8 +419,19 @@ export default function SelectionPDFContent({
                 ))}
               </tbody>
             </table>
+            ) : (
+              <div style={{ 
+                padding: "1rem", 
+                textAlign: "center", 
+                color: "#ef4444",
+                fontWeight: 600,
+                fontSize: "10pt"
+              }}>
+                MISSING ROOM INFORMATION
+              </div>
+            )}
           </div>
-        ))}
+        )})}
       </div>
 
       {/* Footer */}

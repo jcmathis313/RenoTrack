@@ -13,7 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { CreateAssessmentModal } from "@/components/CreateAssessmentModal"
-import { PlusIcon } from "@heroicons/react/24/outline"
+import { PlusIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline"
+import { Input } from "@/components/ui/input"
 
 interface Assessment {
   id: string
@@ -42,6 +43,7 @@ function AssessmentsContent() {
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     fetchAssessments()
@@ -80,6 +82,19 @@ function AssessmentsContent() {
     })
   }
 
+  // Filter assessments based on search query
+  const filteredAssessments = assessments.filter((assessment) => {
+    if (!searchQuery.trim()) return true
+    
+    const query = searchQuery.toLowerCase()
+    return (
+      assessment.unit.number.toLowerCase().includes(query) ||
+      assessment.unit.building.community.name.toLowerCase().includes(query) ||
+      assessment.unit.building.name.toLowerCase().includes(query) ||
+      (assessment.assessedBy && assessment.assessedBy.toLowerCase().includes(query))
+    )
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -97,7 +112,19 @@ function AssessmentsContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Assessments</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>All Assessments</CardTitle>
+            <div className="relative w-64">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search by unit, community, building..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -105,6 +132,10 @@ function AssessmentsContent() {
           ) : assessments.length === 0 ? (
             <div className="text-center py-8 text-sm text-gray-500">
               No assessments found. Create your first assessment to get started.
+            </div>
+          ) : filteredAssessments.length === 0 ? (
+            <div className="text-center py-8 text-sm text-gray-500">
+              No assessments match your search query.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -121,7 +152,7 @@ function AssessmentsContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {assessments.map((assessment) => (
+                  {filteredAssessments.map((assessment) => (
                     <TableRow 
                       key={assessment.id}
                       className="cursor-pointer hover:bg-gray-50"

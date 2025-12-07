@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { UsersTable } from "./UsersTable"
 
 const themeColors = [
   { value: "blue", label: "Blue" },
@@ -160,5 +161,14 @@ export function GeneralSettings() {
         </form>
       </CardContent>
     </Card>
+  )
+}
+
+export function GeneralSettingsWithUsers() {
+  return (
+    <div className="space-y-6">
+      <GeneralSettings />
+      <UsersTable />
+    </div>
   )
 }

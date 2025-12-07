@@ -31,7 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { ArrowLeftIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowPathIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline"
+import { ArrowLeftIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowPathIcon, DocumentDuplicateIcon, PencilIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
 import { CatalogItemSelectModal } from "@/components/CatalogItemSelectModal"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -195,6 +195,13 @@ export default function SelectionDetailPage() {
     unitCost: "",
   })
   const [applyingBulkActions, setApplyingBulkActions] = useState(false)
+  
+  // Room editing state
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
+  const [editingRoomName, setEditingRoomName] = useState("")
+  const [savingRoom, setSavingRoom] = useState(false)
+  const [deleteRoomConfirmOpen, setDeleteRoomConfirmOpen] = useState<string | null>(null)
+  const [deletingRoom, setDeletingRoom] = useState(false)
 
   useEffect(() => {
     if (selectionId) {
@@ -533,6 +540,66 @@ export default function SelectionDetailPage() {
       alert("Failed to delete component")
     } finally {
       setDeletingComponent(false)
+    }
+  }
+
+  const handleEditRoomStart = (room: DesignRoom) => {
+    setEditingRoomId(room.id)
+    setEditingRoomName(room.name)
+  }
+
+  const handleEditRoomCancel = () => {
+    setEditingRoomId(null)
+    setEditingRoomName("")
+  }
+
+  const handleEditRoomSave = async (roomId: string) => {
+    if (!editingRoomName.trim()) {
+      alert("Room name cannot be empty")
+      return
+    }
+
+    setSavingRoom(true)
+    try {
+      const response = await fetch(`/api/design-rooms/${roomId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editingRoomName.trim() }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update room")
+      }
+
+      setEditingRoomId(null)
+      setEditingRoomName("")
+      fetchData()
+    } catch (error) {
+      console.error("Error updating room:", error)
+      alert("Failed to update room")
+    } finally {
+      setSavingRoom(false)
+    }
+  }
+
+  const handleDeleteRoom = async (roomId: string) => {
+    setDeletingRoom(true)
+    try {
+      const response = await fetch(`/api/design-rooms/${roomId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete room")
+      }
+
+      setDeleteRoomConfirmOpen(null)
+      fetchData()
+    } catch (error) {
+      console.error("Error deleting room:", error)
+      alert("Failed to delete room")
+    } finally {
+      setDeletingRoom(false)
     }
   }
 
@@ -1228,15 +1295,81 @@ export default function SelectionDetailPage() {
           <Card key={room.id}>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>{room.name}</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAddComponentOpen(room.id)}
-                >
-                  <PlusIcon className="h-4 w-4 mr-2" />
-                  Add Component
-                </Button>
+                <div className="flex items-center gap-2 flex-1">
+                  {editingRoomId === room.id ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <Input
+                        value={editingRoomName}
+                        onChange={(e) => setEditingRoomName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handleEditRoomSave(room.id)
+                          } else if (e.key === "Escape") {
+                            handleEditRoomCancel()
+                          }
+                        }}
+                        className="h-8 text-base font-semibold"
+                        autoFocus
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleEditRoomSave(room.id)}
+                        disabled={savingRoom}
+                      >
+                        <CheckIcon className="h-4 w-4 text-green-600" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={handleEditRoomCancel}
+                        disabled={savingRoom}
+                      >
+                        <XMarkIcon className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <CardTitle>{room.name}</CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditRoomStart(room)
+                        }}
+                        title="Edit room name"
+                      >
+                        <PencilIcon className="h-4 w-4 text-gray-500" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setDeleteRoomConfirmOpen(room.id)
+                    }}
+                    title="Delete room"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAddComponentOpen(room.id)}
+                  >
+                    <PlusIcon className="h-4 w-4 mr-2" />
+                    Add Component
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -2455,6 +2588,33 @@ export default function SelectionDetailPage() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteComponent} disabled={deletingComponent}>
               {deletingComponent ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Room Confirmation Dialog */}
+      <Dialog open={!!deleteRoomConfirmOpen} onOpenChange={() => setDeleteRoomConfirmOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Room</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this room? All components in this room will also be deleted. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteRoomConfirmOpen(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteRoomConfirmOpen && handleDeleteRoom(deleteRoomConfirmOpen)}
+              disabled={deletingRoom}
+            >
+              {deletingRoom ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

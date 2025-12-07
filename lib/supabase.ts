@@ -23,5 +23,6 @@ export const STORAGE_BUCKETS = {
   INSPECTIONS: "inspections",
   COMMUNITIES: "communities",
   CATALOG: "catalog",
+  PROFILE_PICTURES: "profile-pictures",
 } as const
 

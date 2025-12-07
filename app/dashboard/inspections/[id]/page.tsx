@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, CameraIcon, PencilIcon, ArrowDownTrayIcon, ArrowPathIcon } from "@heroicons/react/24/outline"
+import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, CameraIcon, PencilIcon, ArrowDownTrayIcon, ArrowPathIcon, TrashIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline"
 import {
   Select,
   SelectContent,
@@ -110,6 +111,11 @@ export default function InspectionDetailPage() {
   const [savingNotes, setSavingNotes] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
+  const [editingRoomName, setEditingRoomName] = useState("")
+  const [savingRoom, setSavingRoom] = useState(false)
+  const [deleteRoomConfirmOpen, setDeleteRoomConfirmOpen] = useState<string | null>(null)
+  const [deletingRoom, setDeletingRoom] = useState(false)
 
   useEffect(() => {
     if (inspectionId) {
@@ -463,19 +469,94 @@ export default function InspectionDetailPage() {
         return (
         <Card key={room.id} className="overflow-hidden">
           <CardHeader 
-            className="bg-gray-50 pb-3 cursor-pointer hover:bg-gray-100 transition-colors"
-            onClick={() => toggleRoom(room.id)}
+            className="bg-gray-50 pb-3 hover:bg-gray-100 transition-colors"
           >
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                {isExpanded ? (
-                  <ChevronDownIcon className="h-5 w-5 text-gray-500 shrink-0" />
+              <div className="flex items-center gap-2 flex-1">
+                <button
+                  onClick={() => toggleRoom(room.id)}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  {isExpanded ? (
+                    <ChevronDownIcon className="h-5 w-5 text-gray-500 shrink-0" />
+                  ) : (
+                    <ChevronRightIcon className="h-5 w-5 text-gray-500 shrink-0" />
+                  )}
+                </button>
+                {editingRoomId === room.id ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <Input
+                      value={editingRoomName}
+                      onChange={(e) => setEditingRoomName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleEditRoomSave(room.id)
+                        } else if (e.key === "Escape") {
+                          handleEditRoomCancel()
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-7 text-sm font-semibold"
+                      autoFocus
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleEditRoomSave(room.id)
+                      }}
+                      disabled={savingRoom}
+                    >
+                      <CheckIcon className="h-4 w-4 text-green-600" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleEditRoomCancel()
+                      }}
+                      disabled={savingRoom}
+                    >
+                      <XMarkIcon className="h-4 w-4 text-red-600" />
+                    </Button>
+                  </div>
                 ) : (
-                  <ChevronRightIcon className="h-5 w-5 text-gray-500 shrink-0" />
+                  <>
+                    <CardTitle className="text-sm font-semibold">{room.name}</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleEditRoomStart(room)
+                      }}
+                      title="Edit room name"
+                    >
+                      <PencilIcon className="h-4 w-4 text-gray-500" />
+                    </Button>
+                  </>
                 )}
-                <CardTitle className="text-sm font-semibold">{room.name}</CardTitle>
               </div>
-              {getRoomStatusBadge(room.status)}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDeleteRoomConfirmOpen(room.id)
+                  }}
+                  title="Delete room"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </Button>
+                {getRoomStatusBadge(room.status)}
+              </div>
             </div>
           </CardHeader>
           {isExpanded && (
@@ -683,6 +764,35 @@ export default function InspectionDetailPage() {
               disabled={savingNotes}
             >
               {savingNotes ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Room Confirmation Dialog */}
+      <Dialog open={!!deleteRoomConfirmOpen} onOpenChange={() => setDeleteRoomConfirmOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Room</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this room? All components in this room will also be deleted. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteRoomConfirmOpen(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => deleteRoomConfirmOpen && handleDeleteRoom(deleteRoomConfirmOpen)}
+              disabled={deletingRoom}
+            >
+              {deletingRoom ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
