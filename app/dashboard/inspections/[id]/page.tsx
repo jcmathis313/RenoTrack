@@ -116,6 +116,7 @@ export default function InspectionDetailPage() {
   const [savingRoom, setSavingRoom] = useState(false)
   const [deleteRoomConfirmOpen, setDeleteRoomConfirmOpen] = useState<string | null>(null)
   const [deletingRoom, setDeletingRoom] = useState(false)
+  const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (inspectionId) {
@@ -896,7 +897,11 @@ export default function InspectionDetailPage() {
                             <img
                               src={component.imageUrl}
                               alt={`${component.componentType} inspection photo`}
-                              className="h-20 w-20 object-cover rounded border border-gray-200"
+                              className="h-20 w-20 object-cover rounded border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setViewingImageUrl(component.imageUrl)
+                              }}
                               onError={(e) => {
                                 e.currentTarget.style.display = "none"
                               }}
@@ -992,6 +997,39 @@ export default function InspectionDetailPage() {
               disabled={deletingRoom}
             >
               {deletingRoom ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Viewer Modal */}
+      <Dialog open={!!viewingImageUrl} onOpenChange={(open) => !open && setViewingImageUrl(null)}>
+        <DialogContent className="max-w-4xl w-full p-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle>Inspection Photo</DialogTitle>
+            <DialogDescription>
+              Click outside or press ESC to close
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6 pt-2 flex items-center justify-center bg-gray-50">
+            {viewingImageUrl && (
+              <img
+                src={viewingImageUrl}
+                alt="Inspection photo"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+                onError={(e) => {
+                  e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23f3f4f6' width='400' height='300'/%3E%3Ctext fill='%236b7280' font-family='sans-serif' font-size='16' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage failed to load%3C/text%3E%3C/svg%3E"
+                }}
+              />
+            )}
+          </div>
+          <DialogFooter className="p-6 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setViewingImageUrl(null)}
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
