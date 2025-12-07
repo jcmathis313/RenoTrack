@@ -524,6 +524,67 @@ export default function AssessmentDetailPage() {
     }
   }
 
+  const handleEditRoomSave = async (roomId: string) => {
+    if (!editingRoomName.trim()) {
+      return
+    }
+
+    setSavingRoom(true)
+    try {
+      const response = await fetch(`/api/rooms/${roomId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editingRoomName.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update room")
+      }
+
+      setEditingRoomId(null)
+      setEditingRoomName("")
+      fetchData()
+    } catch (error) {
+      console.error("Error updating room:", error)
+      alert("Failed to update room")
+    } finally {
+      setSavingRoom(false)
+    }
+  }
+
+  const handleEditRoomCancel = () => {
+    setEditingRoomId(null)
+    setEditingRoomName("")
+  }
+
+  const handleEditRoomStart = (room: Room) => {
+    setEditingRoomId(room.id)
+    setEditingRoomName(room.name)
+  }
+
+  const handleDeleteRoom = async (roomId: string) => {
+    setDeletingRoom(true)
+    try {
+      const response = await fetch(`/api/rooms/${roomId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete room")
+      }
+
+      setDeleteRoomConfirmOpen(null)
+      fetchData()
+    } catch (error) {
+      console.error("Error deleting room:", error)
+      alert("Failed to delete room")
+    } finally {
+      setDeletingRoom(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">

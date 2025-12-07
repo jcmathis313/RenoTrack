@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma"
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -18,9 +17,16 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, order } = body
+    const { name, type } = body
 
-    // Verify room belongs to user's tenant
+    if (!name) {
+      return NextResponse.json(
+        { error: "Name is required" },
+        { status: 400 }
+      )
+    }
+
+    // Verify room belongs to an assessment in user's tenant
     const room = await prisma.room.findFirst({
       where: {
         id: params.id,
@@ -43,17 +49,12 @@ export async function PUT(
       )
     }
 
-    const updateData: { name?: string; order?: number } = {}
-    if (name !== undefined) {
-      updateData.name = name.trim()
-    }
-    if (order !== undefined) {
-      updateData.order = order
-    }
-
     const updatedRoom = await prisma.room.update({
       where: { id: params.id },
-      data: updateData,
+      data: {
+        name: name.trim(),
+        type: type?.trim() || null,
+      },
     })
 
     return NextResponse.json(updatedRoom)
@@ -76,7 +77,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Verify room belongs to user's tenant
+    // Verify room belongs to an assessment in user's tenant
     const room = await prisma.room.findFirst({
       where: {
         id: params.id,
