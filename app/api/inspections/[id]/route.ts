@@ -143,8 +143,17 @@ export async function GET(
               ? catalogItems.find((item) => item.id === designComponent.materialId)
               : null
 
-            return {
-              ...inspectionComponent,
+            // Explicitly preserve all component fields, especially imageUrl
+            const enrichedComponent = {
+              id: inspectionComponent.id,
+              inspectionRoomId: inspectionComponent.inspectionRoomId,
+              componentType: inspectionComponent.componentType,
+              componentName: inspectionComponent.componentName,
+              status: inspectionComponent.status,
+              notes: inspectionComponent.notes,
+              imageUrl: inspectionComponent.imageUrl, // Explicitly preserve imageUrl
+              createdAt: inspectionComponent.createdAt,
+              updatedAt: inspectionComponent.updatedAt,
               designComponent: designComponent
                 ? {
                     condition: designComponent.condition,
@@ -158,6 +167,8 @@ export async function GET(
                   }
                 : null,
             }
+
+            return enrichedComponent
           }),
         }
       }),
