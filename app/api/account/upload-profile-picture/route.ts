@@ -98,14 +98,15 @@ export async function POST(request: NextRequest) {
       console.error("Error uploading to Supabase Storage:", uploadError)
       console.error("Upload error details:", {
         message: uploadError.message,
-        statusCode: uploadError.statusCode,
-        error: uploadError.error,
+        error: uploadError,
       })
+      const errorMessage = uploadError.message || "Unknown upload error"
+      const isBucketError = errorMessage.toLowerCase().includes("bucket") || errorMessage.toLowerCase().includes("not found")
       return NextResponse.json(
         { 
           error: "Failed to upload image to storage", 
-          details: uploadError.message || "Unknown upload error",
-          hint: uploadError.statusCode === 400 ? "The bucket may not exist or you may not have permission. Please create the 'profile-pictures' bucket in Supabase Storage." : undefined
+          details: errorMessage,
+          hint: isBucketError ? "The bucket may not exist or you may not have permission. Please create the 'profile-pictures' bucket in Supabase Storage." : undefined
         },
         { status: 500 }
       )
