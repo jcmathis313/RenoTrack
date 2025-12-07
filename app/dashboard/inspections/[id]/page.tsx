@@ -157,7 +157,26 @@ export default function InspectionDetailPage() {
   }
 
   const handleStatusChange = async (componentId: string, status: "pass" | "fail" | null) => {
+    if (!inspection) return
+
+    // Optimistically update the local state immediately for instant feedback
+    const previousInspection = JSON.parse(JSON.stringify(inspection)) // Deep copy for rollback
+    
+    setInspection((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        inspectionRooms: prev.inspectionRooms.map((room) => ({
+          ...room,
+          inspectionComponents: room.inspectionComponents.map((comp) =>
+            comp.id === componentId ? { ...comp, status } : comp
+          ),
+        })),
+      }
+    })
+
     setUpdatingComponent(componentId)
+    
     try {
       const response = await fetch(`/api/inspections/${inspectionId}/components/${componentId}`, {
         method: "PUT",
@@ -171,10 +190,54 @@ export default function InspectionDetailPage() {
         throw new Error("Failed to update component status")
       }
 
-      // Refresh inspection data
-      await fetchInspection()
+      const updatedComponent = await response.json()
+
+      // Update local state with the actual response from server (includes any room status updates)
+      setInspection((prev) => {
+        if (!prev) return prev
+        
+        // Find which room contains this component
+        const roomWithComponent = prev.inspectionRooms.find((room) =>
+          room.inspectionComponents.some((comp) => comp.id === componentId)
+        )
+        
+        if (!roomWithComponent) return prev
+
+        // Update the component status
+        const updatedRooms = prev.inspectionRooms.map((room) => {
+          if (room.id === roomWithComponent.id) {
+            const updatedComponents = room.inspectionComponents.map((comp) =>
+              comp.id === componentId ? { ...comp, status: updatedComponent.status } : comp
+            )
+            
+            // Calculate room status based on updated components
+            const completedCount = updatedComponents.filter((c) => c.status !== null).length
+            const totalCount = updatedComponents.length
+            let roomStatus = "pending"
+            if (completedCount === totalCount && totalCount > 0) {
+              roomStatus = "complete"
+            } else if (completedCount > 0) {
+              roomStatus = "in progress"
+            }
+            
+            return {
+              ...room,
+              status: roomStatus,
+              inspectionComponents: updatedComponents,
+            }
+          }
+          return room
+        })
+        
+        return {
+          ...prev,
+          inspectionRooms: updatedRooms,
+        }
+      })
     } catch (error) {
       console.error("Error updating component:", error)
+      // Rollback to previous state on error
+      setInspection(previousInspection)
       alert("Failed to update component status")
     } finally {
       setUpdatingComponent(null)
@@ -182,6 +245,8 @@ export default function InspectionDetailPage() {
   }
 
   const handleImageUpload = async (componentId: string, file: File) => {
+    if (!inspection) return
+    
     setUploadingImage(componentId)
     try {
       const formData = new FormData()
@@ -194,14 +259,52 @@ export default function InspectionDetailPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || "Failed to upload image")
+        const errorMessage = errorData.error || "Failed to upload image"
+        const errorDetails = errorData.details ? `\n\nDetails: ${errorData.details}` : ""
+        const errorCode = errorData.code ? `\n\nError Code: ${errorData.code}` : ""
+        
+        console.error("Image upload failed:", {
+          error: errorMessage,
+          details: errorData.details,
+          code: errorData.code,
+          meta: errorData.meta,
+          uploadedImageUrl: errorData.uploadedImageUrl,
+        })
+        
+        throw new Error(`${errorMessage}${errorDetails}${errorCode}`)
       }
 
-      // Refresh inspection data
-      await fetchInspection()
+      const updatedComponent = await response.json()
+
+      // Update local state with new image URL
+      setInspection((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          inspectionRooms: prev.inspectionRooms.map((room) => ({
+            ...room,
+            inspectionComponents: room.inspectionComponents.map((comp) =>
+              comp.id === componentId ? { ...comp, imageUrl: updatedComponent.imageUrl } : comp
+            ),
+          })),
+        }
+      })
     } catch (error: any) {
       console.error("Error uploading image:", error)
-      alert(error?.message || "Failed to upload image")
+      
+      // Show more detailed error message
+      let errorMessage = error?.message || "Failed to upload image"
+      
+      // Check for common database errors
+      if (error?.message?.includes("Unknown column") || error?.message?.includes("column") && error?.message?.includes("does not exist")) {
+        errorMessage = "Database schema error: The imageUrl column may be missing. Please run database migrations."
+      } else if (error?.message?.includes("P2002") || error?.message?.includes("Unique constraint")) {
+        errorMessage = "A file with this name already exists. Please try again."
+      } else if (error?.message?.includes("P2025")) {
+        errorMessage = "Component not found in database."
+      }
+      
+      alert(errorMessage)
     } finally {
       setUploadingImage(null)
     }
@@ -248,8 +351,22 @@ export default function InspectionDetailPage() {
         throw new Error("Failed to save notes")
       }
 
-      // Refresh inspection data
-      await fetchInspection()
+      const updatedComponent = await response.json()
+
+      // Update local state with new notes
+      setInspection((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          inspectionRooms: prev.inspectionRooms.map((room) => ({
+            ...room,
+            inspectionComponents: room.inspectionComponents.map((comp) =>
+              comp.id === editingComponentId ? { ...comp, notes: updatedComponent.notes } : comp
+            ),
+          })),
+        }
+      })
+      
       setNotesModalOpen(false)
       setEditingComponentId(null)
       setNotesText("")
@@ -258,6 +375,88 @@ export default function InspectionDetailPage() {
       alert("Failed to save notes")
     } finally {
       setSavingNotes(false)
+    }
+  }
+
+  const handleEditRoomStart = (room: InspectionRoom) => {
+    setEditingRoomId(room.id)
+    setEditingRoomName(room.name)
+  }
+
+  const handleEditRoomCancel = () => {
+    setEditingRoomId(null)
+    setEditingRoomName("")
+  }
+
+  const handleEditRoomSave = async (roomId: string) => {
+    if (!editingRoomName.trim()) {
+      alert("Room name cannot be empty")
+      return
+    }
+
+    setSavingRoom(true)
+    try {
+      const response = await fetch(`/api/inspection-rooms/${roomId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: editingRoomName.trim() }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update room name")
+      }
+
+      const updatedRoom = await response.json()
+
+      // Update local state with new room name
+      setInspection((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          inspectionRooms: prev.inspectionRooms.map((room) =>
+            room.id === roomId ? { ...room, name: updatedRoom.name } : room
+          ),
+        }
+      })
+
+      setEditingRoomId(null)
+      setEditingRoomName("")
+    } catch (error) {
+      console.error("Error updating room:", error)
+      alert("Failed to update room name")
+    } finally {
+      setSavingRoom(false)
+    }
+  }
+
+  const handleDeleteRoom = async (roomId: string) => {
+    setDeletingRoom(true)
+    try {
+      const response = await fetch(`/api/inspection-rooms/${roomId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete room")
+      }
+
+      // Update local state by removing the deleted room
+      setInspection((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          inspectionRooms: prev.inspectionRooms.filter((room) => room.id !== roomId),
+        }
+      })
+
+      setDeleteRoomConfirmOpen(null)
+    } catch (error) {
+      console.error("Error deleting room:", error)
+      alert("Failed to delete room")
+    } finally {
+      setDeletingRoom(false)
     }
   }
 

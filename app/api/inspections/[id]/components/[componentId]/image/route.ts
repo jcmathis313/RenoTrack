@@ -26,7 +26,7 @@ export async function POST(
     }
 
     const resolvedParams = await Promise.resolve(params)
-    const { componentId } = resolvedParams
+    const { componentId, id: inspectionId } = resolvedParams
 
     // Verify the inspection component belongs to the user's tenant
     const component = await prisma.inspectionComponent.findFirst({
@@ -34,6 +34,7 @@ export async function POST(
         id: componentId,
         inspectionRoom: {
           inspection: {
+            id: inspectionId,
             designProject: {
               unit: {
                 building: {
@@ -46,10 +47,26 @@ export async function POST(
           },
         },
       },
+      select: {
+        id: true,
+        inspectionRoomId: true,
+      },
     })
 
     if (!component) {
-      return NextResponse.json({ error: "Component not found" }, { status: 404 })
+      console.error("Component not found or access denied:", {
+        componentId,
+        inspectionId,
+        tenantId: user.tenantId,
+      })
+      return NextResponse.json(
+        { 
+          error: "Component not found or access denied",
+          componentId,
+          inspectionId,
+        }, 
+        { status: 404 }
+      )
     }
 
     const formData = await request.formData()
@@ -107,12 +124,93 @@ export async function POST(
     const imageUrl = urlData.publicUrl
 
     // Update component with image URL
-    await prisma.inspectionComponent.update({
-      where: { id: componentId },
-      data: { imageUrl },
-    })
+    // Verify component exists and belongs to user before updating
+    try {
+      // Double-check component exists using findUnique for better performance
+      const existingComponent = await prisma.inspectionComponent.findUnique({
+        where: { id: componentId },
+        select: { id: true },
+      })
 
-    return NextResponse.json({ imageUrl })
+      if (!existingComponent) {
+        // File was uploaded but component doesn't exist - rollback
+        console.error("Component not found for update after upload:", componentId)
+        const { error: deleteError } = await supabase.storage
+          .from(STORAGE_BUCKETS.INSPECTIONS)
+          .remove([filename])
+        
+        if (deleteError) {
+          console.error("Failed to delete uploaded file during rollback:", deleteError)
+        }
+
+        return NextResponse.json(
+          { 
+            error: "Component not found in database",
+            componentId,
+            uploadedImageUrl: imageUrl, // Include for manual recovery
+          },
+          { status: 404 }
+        )
+      }
+
+      // Update the component
+      const updatedComponent = await prisma.inspectionComponent.update({
+        where: { id: componentId },
+        data: { imageUrl },
+        select: {
+          id: true,
+          imageUrl: true,
+        },
+      })
+
+      console.log("Successfully updated component image:", {
+        componentId: updatedComponent.id,
+        imageUrl: updatedComponent.imageUrl,
+      })
+
+      return NextResponse.json({ 
+        imageUrl: updatedComponent.imageUrl,
+        componentId: updatedComponent.id 
+      })
+    } catch (dbError: any) {
+      // If database update fails, try to delete the uploaded file from Supabase
+      console.error("Database update failed after successful upload:", {
+        componentId,
+        error: dbError?.message,
+        code: dbError?.code,
+        meta: dbError?.meta,
+        stack: dbError?.stack,
+      })
+      console.error("Attempting to rollback: delete uploaded file from Supabase")
+      
+      try {
+        const { error: deleteError } = await supabase.storage
+          .from(STORAGE_BUCKETS.INSPECTIONS)
+          .remove([filename])
+        
+        if (deleteError) {
+          console.error("Failed to delete uploaded file during rollback:", deleteError)
+        } else {
+          console.log("Successfully rolled back uploaded file:", filename)
+        }
+      } catch (rollbackError) {
+        console.error("Rollback failed:", rollbackError)
+      }
+
+      // Return detailed error information
+      return NextResponse.json(
+        { 
+          error: "Failed to update component in database",
+          details: dbError?.message || "Unknown database error",
+          code: dbError?.code,
+          meta: dbError?.meta,
+          componentId,
+          // Include the imageUrl so it can be manually fixed if needed
+          uploadedImageUrl: imageUrl,
+        },
+        { status: 500 }
+      )
+    }
   } catch (error: any) {
     console.error("Error uploading image:", error)
     return NextResponse.json(
