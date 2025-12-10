@@ -25,6 +25,7 @@ import { MagnifyingGlassIcon } from "@heroicons/react/24/outline"
 interface Selection {
   id: string
   name: string
+  unitId?: string
   unit: {
     id: string
     number: string
@@ -38,6 +39,12 @@ interface Selection {
   }
 }
 
+interface Project {
+  id: string
+  name: string
+  unitId: string
+}
+
 interface CreateInspectionModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -49,6 +56,7 @@ export function CreateInspectionModal({
 }: CreateInspectionModalProps) {
   const router = useRouter()
   const [selections, setSelections] = useState<Selection[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -56,6 +64,7 @@ export function CreateInspectionModal({
 
   const [formData, setFormData] = useState({
     designProjectId: "",
+    projectId: "",
   })
 
   useEffect(() => {
@@ -63,6 +72,7 @@ export function CreateInspectionModal({
       fetchCompleteSelections()
       setFormData({
         designProjectId: "",
+        projectId: "",
       })
       setSearchTerm("")
       setError("")
@@ -72,22 +82,37 @@ export function CreateInspectionModal({
   const fetchCompleteSelections = async () => {
     setLoading(true)
     try {
-      const response = await fetch("/api/selections")
-      if (response.ok) {
-        const data = await response.json()
+      const [selectionsResponse, projectsResponse] = await Promise.all([
+        fetch("/api/selections"),
+        fetch("/api/projects"),
+      ])
+
+      if (selectionsResponse.ok) {
+        const data = await selectionsResponse.json()
         // Filter only complete selections
         const completeSelections = data.filter(
           (s: any) => s.status === "complete"
         )
         setSelections(completeSelections)
       }
+
+      if (projectsResponse.ok) {
+        const data = await projectsResponse.json()
+        setProjects(data)
+      }
     } catch (error) {
-      console.error("Error fetching selections:", error)
-      setError("Failed to load selections")
+      console.error("Error fetching data:", error)
+      setError("Failed to load data")
     } finally {
       setLoading(false)
     }
   }
+
+  // Get projects for the selected selection's unit
+  const selectedSelection = selections.find((s) => s.id === formData.designProjectId)
+  const availableProjects = selectedSelection
+    ? projects.filter((p) => p.unitId === selectedSelection.unit.id)
+    : []
 
   const filteredSelections = selections.filter((selection) => {
     const searchLower = searchTerm.toLowerCase()
@@ -110,7 +135,10 @@ export function CreateInspectionModal({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          designProjectId: formData.designProjectId,
+          projectId: formData.projectId || undefined,
+        }),
       })
 
       if (!response.ok) {
@@ -170,6 +198,7 @@ export function CreateInspectionModal({
                         setFormData({
                           ...formData,
                           designProjectId: selection.id,
+                          projectId: "", // Reset project when selection changes
                         })
                       }
                       className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b last:border-b-0 ${
@@ -189,6 +218,34 @@ export function CreateInspectionModal({
                 </div>
               )}
             </div>
+
+            {formData.designProjectId && (
+              <div className="grid gap-2">
+                <Label htmlFor="projectId">Project (Optional)</Label>
+                <Select
+                  value={formData.projectId || undefined}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, projectId: value })
+                  }
+                >
+                  <SelectTrigger id="projectId">
+                    <SelectValue placeholder="Select a project (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {availableProjects.length === 0 && (
+                  <p className="text-xs text-gray-500">
+                    No projects available for this unit
+                  </p>
+                )}
+              </div>
+            )}
 
             {error && (
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">

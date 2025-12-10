@@ -29,6 +29,7 @@ model Tenant {
   vendors             Vendor[]
   templates           Template[]
   activityLogs        ActivityLog[]
+  projects            Project[]
 
   @@index([slug])
 }
@@ -46,7 +47,8 @@ model User {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects ProjectAssignment[]
 
   @@unique([email, tenantId])
   @@index([tenantId])
@@ -91,6 +93,7 @@ model Unit {
   building       Building        @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   assessments    Assessment[]
   designProjects DesignProject[]
+  projects       Project[]
 
   @@index([buildingId])
 }
@@ -98,6 +101,7 @@ model Unit {
 model Assessment {
   id         String   @id @default(cuid())
   unitId     String
+  projectId  String?
   assessedBy String?
   assessedAt DateTime @default(now())
   notes      String?
@@ -105,10 +109,12 @@ model Assessment {
   updatedAt  DateTime @updatedAt
 
   unit           Unit            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   rooms          Room[]
   designProjects DesignProject[]
 
   @@index([unitId])
+  @@index([projectId])
 }
 
 model Room {
@@ -146,6 +152,7 @@ model ComponentAssessment {
 model DesignProject {
   id           String   @id @default(cuid())
   unitId       String
+  projectId    String?
   assessmentId String? // Optional link to assessment
   name         String
   status       String? // "Draft" | "In Progress" | "Completed"
@@ -154,11 +161,13 @@ model DesignProject {
   updatedAt    DateTime @updatedAt
 
   unit        Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
   assessment  Assessment?  @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
   designRooms DesignRoom[]
   inspections Inspection[]
 
   @@index([unitId])
+  @@index([projectId])
   @@index([assessmentId])
 }
 
@@ -337,6 +346,7 @@ model CatalogItem {
 model Inspection {
   id              String   @id @default(cuid())
   designProjectId String
+  projectId       String?
   inspectedBy     String?
   inspectedAt     DateTime @default(now())
   status          String?  @default("in progress") // "in progress" | "complete"
@@ -345,9 +355,11 @@ model Inspection {
   updatedAt       DateTime @updatedAt
 
   designProject   DesignProject    @relation(fields: [designProjectId], references: [id], onDelete: Cascade)
+  project         Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
   inspectionRooms InspectionRoom[]
 
   @@index([designProjectId])
+  @@index([projectId])
 }
 
 model InspectionRoom {
@@ -448,4 +460,70 @@ model ActivityLog {
   @@index([tenantId])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  unitId      String
+  tenantId    String
+  name        String
+  notes       String?
+  vacancyDate DateTime?
+  moveInDate  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  unit        Unit                 @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assessments Assessment[]
+  selections  DesignProject[]
+  inspections Inspection[]
+  assignments ProjectAssignment[]
+  residents   ProjectResident[]
+  projectNotes ProjectNote[]
+
+  @@index([unitId])
+  @@index([tenantId])
+}
+
+model ProjectResident {
+  id         String   @id @default(cuid())
+  projectId  String
+  lastName   String
+  firstName  String
+  phone      String?
+  email      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model ProjectNote {
+  id        String   @id @default(cuid())
+  projectId String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+model ProjectAssignment {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
 }

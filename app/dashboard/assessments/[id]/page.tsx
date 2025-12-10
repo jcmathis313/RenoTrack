@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
   TableBody,
@@ -30,8 +31,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { ArrowLeftIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ArrowUpIcon, ArrowDownIcon, ArrowDownTrayIcon, ArrowPathIcon, PencilIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline"
+import { ArrowLeftIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ArrowUpIcon, ArrowDownIcon, ArrowDownTrayIcon, ArrowPathIcon, PencilIcon, CheckIcon, XMarkIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
+import { AssessmentImportTemplateModal } from "@/components/AssessmentImportTemplateModal"
 
 interface ComponentCategory {
   id: string
@@ -73,6 +75,11 @@ interface Assessment {
   id: string
   assessedBy: string | null
   assessedAt: string
+  projectId: string | null
+  project?: {
+    id: string
+    name: string
+  } | null
   unit: {
     id: string
     number: string
@@ -99,6 +106,7 @@ export default function AssessmentDetailPage() {
   const [roomTemplates, setRoomTemplates] = useState<RoomTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [addRoomOpen, setAddRoomOpen] = useState(false)
+  const [importTemplateOpen, setImportTemplateOpen] = useState(false)
   const [addComponentOpen, setAddComponentOpen] = useState<string | null>(null)
 
   const [newRoomName, setNewRoomName] = useState("")
@@ -131,6 +139,19 @@ export default function AssessmentDetailPage() {
   const [savingRoom, setSavingRoom] = useState(false)
   const [deleteRoomConfirmOpen, setDeleteRoomConfirmOpen] = useState<string | null>(null)
   const [deletingRoom, setDeletingRoom] = useState(false)
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
+  const [savingProject, setSavingProject] = useState(false)
+  const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set())
+  const [notesModalOpen, setNotesModalOpen] = useState(false)
+  const [notesComponentId, setNotesComponentId] = useState<string | null>(null)
+  const [notesText, setNotesText] = useState("")
+  const [savingNotes, setSavingNotes] = useState(false)
+  const [updatingCondition, setUpdatingCondition] = useState<string | null>(null)
+  const [editComponentDialogOpen, setEditComponentDialogOpen] = useState(false)
+  const [editingNotesInline, setEditingNotesInline] = useState<string | null>(null)
+  const [inlineNotesText, setInlineNotesText] = useState("")
+  const [savingInlineNotes, setSavingInlineNotes] = useState(false)
 
   useEffect(() => {
     if (assessmentId) {
@@ -140,6 +161,25 @@ export default function AssessmentDetailPage() {
       console.error("Assessment ID not found in params")
     }
   }, [assessmentId])
+
+  useEffect(() => {
+    // Expand all rooms by default when assessment loads
+    if (assessment && assessment.rooms.length > 0) {
+      setExpandedRooms(new Set(assessment.rooms.map(room => room.id)))
+    }
+  }, [assessment])
+
+  const toggleRoom = (roomId: string) => {
+    setExpandedRooms(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(roomId)) {
+        newSet.delete(roomId)
+      } else {
+        newSet.add(roomId)
+      }
+      return newSet
+    })
+  }
 
   const fetchData = async () => {
     if (!assessmentId) {
@@ -161,6 +201,16 @@ export default function AssessmentDetailPage() {
       if (assessmentRes.ok) {
         const assessmentData = await assessmentRes.json()
         setAssessment(assessmentData)
+        setCurrentProjectId(assessmentData.projectId || null)
+        
+        // Fetch projects for this unit
+        if (assessmentData.unit?.id) {
+          const projectsResponse = await fetch(`/api/projects?unitId=${assessmentData.unit.id}`)
+          if (projectsResponse.ok) {
+            const projectsData = await projectsResponse.json()
+            setProjects(projectsData)
+          }
+        }
       } else {
         // Handle error response
         const errorData = await assessmentRes.json().catch(() => ({}))
@@ -424,6 +474,213 @@ export default function AssessmentDetailPage() {
     }
   }
 
+  const handleConditionChange = async (componentId: string, condition: string) => {
+    if (!assessment) return
+
+    // Optimistically update the local state immediately for instant feedback
+    const previousAssessment = JSON.parse(JSON.stringify(assessment)) // Deep copy for rollback
+    
+    setAssessment((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        rooms: prev.rooms.map((room) => ({
+          ...room,
+          componentAssessments: room.componentAssessments.map((comp) =>
+            comp.id === componentId ? { ...comp, condition } : comp
+          ),
+        })),
+      }
+    })
+
+    setUpdatingCondition(componentId)
+    
+    try {
+      const component = assessment.rooms
+        .flatMap(room => room.componentAssessments)
+        .find(comp => comp.id === componentId)
+
+      if (!component) {
+        throw new Error("Component not found")
+      }
+
+      const response = await fetch(`/api/component-assessments/${componentId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          componentType: component.componentType,
+          componentName: component.componentName,
+          condition: condition,
+          notes: component.notes,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update component condition")
+      }
+
+      const updatedComponent = await response.json()
+
+      // Update local state with the actual response from server
+      setAssessment((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          rooms: prev.rooms.map((room) => ({
+            ...room,
+            componentAssessments: room.componentAssessments.map((comp) =>
+              comp.id === componentId ? { ...comp, condition: updatedComponent.condition } : comp
+            ),
+          })),
+        }
+      })
+    } catch (error) {
+      console.error("Error updating component condition:", error)
+      // Rollback to previous state on error
+      setAssessment(previousAssessment)
+      alert("Failed to update component condition")
+    } finally {
+      setUpdatingCondition(null)
+    }
+  }
+
+  const handleNotesClick = (componentId: string) => {
+    const component = assessment?.rooms
+      .flatMap(room => room.componentAssessments)
+      .find(comp => comp.id === componentId)
+    
+    setNotesComponentId(componentId)
+    setNotesText(component?.notes || "")
+    setNotesModalOpen(true)
+  }
+
+  const handleSaveNotes = async () => {
+    if (!notesComponentId) return
+
+    setSavingNotes(true)
+    try {
+      const component = assessment?.rooms
+        .flatMap(room => room.componentAssessments)
+        .find(comp => comp.id === notesComponentId)
+
+      if (!component) {
+        throw new Error("Component not found")
+      }
+
+      const response = await fetch(`/api/component-assessments/${notesComponentId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          componentType: component.componentType,
+          componentName: component.componentName,
+          condition: component.condition,
+          notes: notesText,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to save notes")
+      }
+
+      const updatedComponent = await response.json()
+
+      // Update local state with new notes
+      setAssessment((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          rooms: prev.rooms.map((room) => ({
+            ...room,
+            componentAssessments: room.componentAssessments.map((comp) =>
+              comp.id === notesComponentId ? { ...comp, notes: updatedComponent.notes } : comp
+            ),
+          })),
+        }
+      })
+      
+      setNotesModalOpen(false)
+      setNotesComponentId(null)
+      setNotesText("")
+    } catch (error) {
+      console.error("Error saving notes:", error)
+      alert("Failed to save notes")
+    } finally {
+      setSavingNotes(false)
+    }
+  }
+
+  const handleStartEditingNotesInline = (componentId: string) => {
+    const component = assessment?.rooms
+      .flatMap(room => room.componentAssessments)
+      .find(comp => comp.id === componentId)
+    
+    setEditingNotesInline(componentId)
+    setInlineNotesText(component?.notes || "")
+  }
+
+  const handleSaveInlineNotes = async (componentId: string) => {
+    setSavingInlineNotes(true)
+    try {
+      const component = assessment?.rooms
+        .flatMap(room => room.componentAssessments)
+        .find(comp => comp.id === componentId)
+
+      if (!component) {
+        throw new Error("Component not found")
+      }
+
+      const response = await fetch(`/api/component-assessments/${componentId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          componentType: component.componentType,
+          componentName: component.componentName,
+          condition: component.condition,
+          notes: inlineNotesText,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to save notes")
+      }
+
+      const updatedComponent = await response.json()
+
+      // Update local state with new notes
+      setAssessment((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          rooms: prev.rooms.map((room) => ({
+            ...room,
+            componentAssessments: room.componentAssessments.map((comp) =>
+              comp.id === componentId ? { ...comp, notes: updatedComponent.notes } : comp
+            ),
+          })),
+        }
+      })
+      
+      setEditingNotesInline(null)
+      setInlineNotesText("")
+    } catch (error) {
+      console.error("Error saving notes:", error)
+      alert("Failed to save notes")
+    } finally {
+      setSavingInlineNotes(false)
+    }
+  }
+
+  const handleCancelInlineNotes = () => {
+    setEditingNotesInline(null)
+    setInlineNotesText("")
+  }
+
   const handleMoveRoom = async (roomId: string, direction: "up" | "down") => {
     if (!assessment || reorderingRooms) return
 
@@ -607,18 +864,43 @@ export default function AssessmentDetailPage() {
     )
   }
 
+  const handleProjectChange = async (projectId: string) => {
+    setSavingProject(true)
+    try {
+      const response = await fetch(`/api/assessments/${assessmentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: projectId || null }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update project association")
+      }
+
+      setCurrentProjectId(projectId || null)
+      router.refresh()
+    } catch (error) {
+      console.error("Error updating project:", error)
+      alert("Failed to update project association")
+    } finally {
+      setSavingProject(false)
+    }
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Assessment</h1>
-          <p className="mt-1 text-sm text-gray-500">
+      <div className="flex items-center justify-between flex-wrap gap-3 md:gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Assessment</h1>
+          <p className="mt-1 text-xs md:text-sm text-gray-500 break-words">
             {assessment.unit.building.community.name} - {assessment.unit.building.name} - Unit {assessment.unit.number}
           </p>
         </div>
         <Button
           variant="outline"
+          size="sm"
+          className="shrink-0"
           disabled={exportingPDF}
           onClick={async () => {
             setExportingPDF(true)
@@ -655,7 +937,8 @@ export default function AssessmentDetailPage() {
           ) : (
             <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
           )}
-          {exportingPDF ? "Generating PDF..." : "Export PDF"}
+          <span className="hidden sm:inline">{exportingPDF ? "Generating PDF..." : "Export PDF"}</span>
+          <span className="sm:hidden">PDF</span>
         </Button>
       </div>
 
@@ -676,7 +959,7 @@ export default function AssessmentDetailPage() {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-x-4 gap-y-2">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-x-4 gap-y-2">
             <div>
               <Label className="text-gray-500 text-xs">Community</Label>
               <p className="text-xs font-medium mt-0.5">{assessment.unit.building.community.name}</p>
@@ -701,34 +984,104 @@ export default function AssessmentDetailPage() {
                 <p className="text-xs font-medium mt-0.5">{assessment.assessedBy}</p>
               </div>
             )}
+            <div>
+              <Label className="text-gray-500 text-xs">Project</Label>
+              <div className="mt-0.5">
+                <Select
+                  value={currentProjectId || undefined}
+                  onValueChange={handleProjectChange}
+                  disabled={savingProject || projects.length === 0}
+                >
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue placeholder="No project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Rooms */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Rooms</h2>
-          <Button onClick={() => setAddRoomOpen(true)}>
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Add Room
-          </Button>
+        <div className="flex items-center justify-between flex-wrap gap-2 md:gap-3">
+          <h2 className="text-base md:text-lg font-semibold text-gray-900">Rooms</h2>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setImportTemplateOpen(true)}
+              className="text-xs md:text-sm"
+            >
+              <DocumentDuplicateIcon className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Import Template</span>
+              <span className="sm:hidden">Import</span>
+            </Button>
+            <Button 
+              size="sm"
+              onClick={() => setAddRoomOpen(true)}
+              className="text-xs md:text-sm"
+            >
+              <PlusIcon className="h-4 w-4 mr-1 md:mr-2" />
+              Add Room
+            </Button>
+          </div>
         </div>
 
         {assessment.rooms.length === 0 ? (
           <Card>
-            <CardContent className="py-8 text-center text-sm text-gray-500">
-              No rooms added yet. Add a room to start assessing components.
+            <CardContent className="py-8 md:py-12 text-center space-y-4 px-4">
+              <p className="text-sm md:text-base text-gray-500">No rooms added yet. Import a template or add your first room to start assessing components.</p>
+              <div className="flex flex-col sm:flex-row justify-center gap-2">
+                <Button 
+                  size="sm"
+                  onClick={() => setImportTemplateOpen(true)}
+                  className="w-full sm:w-auto"
+                >
+                  <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
+                  Import Template
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setAddRoomOpen(true)}
+                  className="w-full sm:w-auto"
+                >
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Add Room
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : (
-          assessment.rooms.map((room, roomIndex) => (
-            <Card key={room.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-1">
+          assessment.rooms.map((room, roomIndex) => {
+            const isExpanded = expandedRooms.has(room.id)
+            return (
+            <Card key={room.id} className="overflow-hidden">
+              <CardHeader 
+                className="bg-gray-50 pb-3 hover:bg-gray-100 transition-colors px-3 md:px-6"
+              >
+                <div className="flex items-center justify-between flex-wrap gap-2 md:gap-3">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <button
+                      onClick={() => toggleRoom(room.id)}
+                      className="flex items-center gap-2 cursor-pointer shrink-0"
+                    >
+                      {isExpanded ? (
+                        <ChevronDownIcon className="h-5 w-5 text-gray-500 shrink-0" />
+                      ) : (
+                        <ChevronRightIcon className="h-5 w-5 text-gray-500 shrink-0" />
+                      )}
+                    </button>
                     {editingRoomId === room.id ? (
-                      <div className="flex items-center gap-2 flex-1">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
                         <Input
                           value={editingRoomName}
                           onChange={(e) => setEditingRoomName(e.target.value)}
@@ -739,14 +1092,18 @@ export default function AssessmentDetailPage() {
                               handleEditRoomCancel()
                             }
                           }}
-                          className="h-8 text-base font-semibold"
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-7 text-sm font-semibold"
                           autoFocus
                         />
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleEditRoomSave(room.id)}
+                          className="h-7 w-7 p-0 shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEditRoomSave(room.id)
+                          }}
                           disabled={savingRoom}
                         >
                           <CheckIcon className="h-4 w-4 text-green-600" />
@@ -754,8 +1111,11 @@ export default function AssessmentDetailPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={handleEditRoomCancel}
+                          className="h-7 w-7 p-0 shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEditRoomCancel()
+                          }}
                           disabled={savingRoom}
                         >
                           <XMarkIcon className="h-4 w-4 text-red-600" />
@@ -763,11 +1123,11 @@ export default function AssessmentDetailPage() {
                       </div>
                     ) : (
                       <>
-                        <CardTitle>{room.name}</CardTitle>
+                        <CardTitle className="text-sm md:text-base font-semibold truncate">{room.name}</CardTitle>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 w-6 p-0"
+                          className="h-6 w-6 p-0 shrink-0"
                           onClick={(e) => {
                             e.stopPropagation()
                             handleEditRoomStart(room)
@@ -779,12 +1139,12 @@ export default function AssessmentDetailPage() {
                       </>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+                    <div className="flex gap-0.5">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0"
+                        className="h-7 w-7 p-0"
                         onClick={(e) => {
                           e.stopPropagation()
                           handleMoveRoom(room.id, "up")
@@ -797,7 +1157,7 @@ export default function AssessmentDetailPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0"
+                        className="h-7 w-7 p-0"
                         onClick={(e) => {
                           e.stopPropagation()
                           handleMoveRoom(room.id, "down")
@@ -811,7 +1171,7 @@ export default function AssessmentDetailPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                       onClick={(e) => {
                         e.stopPropagation()
                         setDeleteRoomConfirmOpen(room.id)
@@ -823,207 +1183,237 @@ export default function AssessmentDetailPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setAddComponentOpen(room.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setAddComponentOpen(room.id)
+                      }}
+                      className="text-xs md:text-sm"
                     >
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      Add Component
+                      <PlusIcon className="h-4 w-4 mr-1 md:mr-2" />
+                      <span className="hidden sm:inline">Add Component</span>
+                      <span className="sm:hidden">Add</span>
                     </Button>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                {room.componentAssessments.length === 0 ? (
-                  <div className="py-4 text-center text-sm text-gray-500">
-                    No components assessed yet. Add components to this room.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table className="table-fixed w-full">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-1/4">Component Type</TableHead>
-                          <TableHead className="w-1/4">Condition</TableHead>
-                          <TableHead className="w-1/2">Notes</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {room.componentAssessments.map((component) => (
-                          <React.Fragment key={component.id}>
-                            <TableRow
-                              className={`cursor-pointer hover:bg-gray-50 ${
-                                editingComponentId === component.id ? "bg-blue-50" : ""
-                              }`}
-                              onClick={() => handleRowClick(component)}
-                            >
-                              <TableCell className="w-1/4">
-                                <span className="text-xs font-medium">{component.componentType}</span>
-                              </TableCell>
-                              <TableCell className="w-1/4">
-                                {(() => {
-                                  const status = componentStatuses.find(s => s.name === component.condition)
-                                  const color = status?.color || "gray"
-                                  const colorClasses = {
-                                    green: "bg-green-50 text-green-700",
-                                    orange: "bg-orange-50 text-orange-700",
-                                    blue: "bg-blue-50 text-blue-700",
-                                    red: "bg-red-50 text-red-700",
-                                    gray: "bg-gray-50 text-gray-700",
-                                    yellow: "bg-yellow-50 text-yellow-700",
-                                    purple: "bg-purple-50 text-purple-700",
+              {isExpanded && (
+              <CardContent className="p-0">
+                <div className="divide-y divide-gray-200">
+                  {room.componentAssessments.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-gray-500">
+                      No components assessed yet. Add components to this room.
+                    </div>
+                  ) : (
+                    room.componentAssessments.map((component) => {
+                      const status = componentStatuses.find(s => s.name === component.condition)
+                      const color = status?.color || "gray"
+                      const colorClasses = {
+                        green: "bg-green-50 text-green-700",
+                        orange: "bg-orange-50 text-orange-700",
+                        blue: "bg-blue-50 text-blue-700",
+                        red: "bg-red-50 text-red-700",
+                        gray: "bg-gray-50 text-gray-700",
+                        yellow: "bg-yellow-50 text-yellow-700",
+                        purple: "bg-purple-50 text-purple-700",
+                      }
+                      return (
+                        <div
+                          key={component.id}
+                          className={cn(
+                            "flex flex-col gap-2 sm:gap-3 p-3 md:p-4 hover:bg-gray-50 transition-colors",
+                            colorClasses[color as keyof typeof colorClasses]?.replace("text-", "bg-").replace("-700", "-50/50") || "bg-gray-50/50"
+                          )}
+                        >
+                          <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-2">
+                            <div className="flex-1 min-w-0 w-full sm:w-auto">
+                              {/* Breadcrumb */}
+                              <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+                                <span>{room.name}</span>
+                                <ChevronRightIcon className="h-3 w-3" />
+                                <span>{component.componentType}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="font-semibold text-sm md:text-base">
+                                  {component.componentType}
+                                  {component.componentName && component.componentName !== component.componentType && (
+                                    <span className="text-gray-500 ml-1 font-normal">- {component.componentName}</span>
+                                  )}
+                                </div>
+                                {/* Edit icon - visible on md and up */}
+                                <button
+                                  onClick={() => {
+                                    setEditingComponentId(component.id)
+                                    setEditingComponent({
+                                      componentType: component.componentType,
+                                      condition: component.condition,
+                                      notes: component.notes || "",
+                                    })
+                                    setEditComponentDialogOpen(true)
+                                  }}
+                                  className="hidden md:flex items-center justify-center h-6 w-6 rounded hover:bg-gray-100 transition-colors"
+                                  title="Edit component"
+                                >
+                                  <PencilIcon className="h-4 w-4 text-gray-500" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto">
+                              <div className="flex flex-wrap gap-1.5 md:gap-2">
+                                {componentStatuses.map((statusOption) => {
+                                  const isSelected = component.condition === statusOption.name
+                                  const statusColor = statusOption.color || "gray"
+                                  const buttonColorClasses = {
+                                    green: isSelected ? "bg-green-600 hover:bg-green-700 text-white" : "border-green-300 text-green-700 hover:bg-green-50",
+                                    orange: isSelected ? "bg-orange-600 hover:bg-orange-700 text-white" : "border-orange-300 text-orange-700 hover:bg-orange-50",
+                                    blue: isSelected ? "bg-blue-600 hover:bg-blue-700 text-white" : "border-blue-300 text-blue-700 hover:bg-blue-50",
+                                    red: isSelected ? "bg-red-600 hover:bg-red-700 text-white" : "border-red-300 text-red-700 hover:bg-red-50",
+                                    gray: isSelected ? "bg-gray-600 hover:bg-gray-700 text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50",
+                                    yellow: isSelected ? "bg-yellow-600 hover:bg-yellow-700 text-white" : "border-yellow-300 text-yellow-700 hover:bg-yellow-50",
+                                    purple: isSelected ? "bg-purple-600 hover:bg-purple-700 text-white" : "border-purple-300 text-purple-700 hover:bg-purple-50",
                                   }
                                   return (
-                                    <span className={cn(
-                                      "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium",
-                                      colorClasses[color as keyof typeof colorClasses] || colorClasses.gray
-                                    )}>
-                                      {component.condition}
-                                    </span>
+                                    <Button
+                                      key={statusOption.id}
+                                      size="sm"
+                                      variant={isSelected ? "default" : "outline"}
+                                      className={cn(
+                                        "min-w-[50px] sm:min-w-[60px] md:min-w-[80px] h-8 sm:h-9 md:h-10 text-xs font-semibold px-2 md:px-3",
+                                        buttonColorClasses[statusColor as keyof typeof buttonColorClasses] || buttonColorClasses.gray
+                                      )}
+                                      onClick={() => handleConditionChange(component.id, statusOption.name)}
+                                      disabled={updatingCondition === component.id}
+                                    >
+                                      {updatingCondition === component.id && isSelected ? "..." : statusOption.name}
+                                    </Button>
                                   )
-                                })()}
-                              </TableCell>
-                              <TableCell className="w-1/2">
-                                {component.notes ? (
-                                  <span className="text-xs whitespace-pre-wrap">{component.notes}</span>
-                                ) : (
-                                  <span className="text-xs text-gray-400">—</span>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                            {editingComponentId === component.id && editingComponent && (
-                              <TableRow className="bg-blue-50">
-                                <TableCell colSpan={3} className="p-4">
-                                  <div
-                                    className="space-y-4"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div className="space-y-2">
-                                        <Label htmlFor={`edit-componentType-${component.id}`} className="text-xs">
-                                          Component Type *
-                                        </Label>
-                                        <Input
-                                          id={`edit-componentType-${component.id}`}
-                                          value={editingComponent.componentType}
-                                          onChange={(e) =>
-                                            setEditingComponent({
-                                              ...editingComponent,
-                                              componentType: e.target.value,
-                                            })
-                                          }
-                                          className="h-8 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label htmlFor={`edit-condition-${component.id}`} className="text-xs">
-                                          Condition *
-                                        </Label>
-                                        <Select
-                                          value={editingComponent.condition}
-                                          onValueChange={(value) =>
-                                            setEditingComponent({
-                                              ...editingComponent,
-                                              condition: value,
-                                            })
-                                          }
-                                        >
-                                          <SelectTrigger id={`edit-condition-${component.id}`} className="h-8 text-xs">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {componentStatuses.map((status) => {
-                                              const color = status.color || "gray"
-                                              const colorClasses = {
-                                                green: "bg-green-500",
-                                                orange: "bg-orange-500",
-                                                blue: "bg-blue-500",
-                                                red: "bg-red-500",
-                                                gray: "bg-gray-500",
-                                                yellow: "bg-yellow-500",
-                                                purple: "bg-purple-500",
-                                              }
-                                              return (
-                                                <SelectItem key={status.id} value={status.name}>
-                                                  <div className="flex items-center gap-2">
-                                                    <div className={cn(
-                                                      "w-3 h-3 rounded-full border border-gray-300",
-                                                      colorClasses[color as keyof typeof colorClasses] || colorClasses.gray
-                                                    )} />
-                                                    <span>{status.name}</span>
-                                                  </div>
-                                                </SelectItem>
-                                              )
-                                            })}
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <Label htmlFor={`edit-notes-${component.id}`} className="text-xs">
-                                        Notes
-                                      </Label>
-                                      <textarea
-                                        id={`edit-notes-${component.id}`}
-                                        value={editingComponent.notes}
-                                        onChange={(e) =>
-                                          setEditingComponent({
-                                            ...editingComponent,
-                                            notes: e.target.value,
-                                          })
-                                        }
-                                        placeholder="Optional notes..."
-                                        rows={4}
-                                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                      />
-                                    </div>
-                                    <div className="flex items-center justify-between pt-2 border-t">
-                                      <Button
-                                        type="button"
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() => setDeleteConfirmOpen(component.id)}
-                                        disabled={deletingComponent}
-                                      >
-                                        Delete
-                                      </Button>
-                                      <div className="flex gap-2">
-                                        <Button
-                                          type="button"
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            setEditingComponentId(null)
-                                            setEditingComponent(null)
-                                          }}
-                                        >
-                                          Cancel
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          onClick={() => handleSaveComponent(component.id)}
-                                          disabled={
-                                            savingComponent ||
-                                            !editingComponent.componentType ||
-                                            !editingComponent.condition
-                                          }
-                                        >
-                                          {savingComponent ? "Saving..." : "Save"}
-                                        </Button>
-                                      </div>
-                                    </div>
+                                })}
+                              </div>
+                              {/* Mobile: Show buttons */}
+                              <div className="flex flex-col gap-2 md:hidden">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-9 text-xs font-semibold w-full min-w-[100px]"
+                                  onClick={() => handleNotesClick(component.id)}
+                                >
+                                  <PencilIcon className="h-4 w-4 mr-2" />
+                                  Notes
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-9 text-xs font-semibold w-full min-w-[100px]"
+                                  onClick={() => {
+                                    setEditingComponentId(component.id)
+                                    setEditingComponent({
+                                      componentType: component.componentType,
+                                      condition: component.condition,
+                                      notes: component.notes || "",
+                                    })
+                                    setEditComponentDialogOpen(true)
+                                  }}
+                                >
+                                  <PencilIcon className="h-4 w-4 mr-2" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-9 text-xs font-semibold w-full min-w-[100px] text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => setDeleteConfirmOpen(component.id)}
+                                  disabled={deletingComponent}
+                                >
+                                  <TrashIcon className="h-4 w-4 mr-2" />
+                                  Delete
+                                </Button>
+                              </div>
+                              {/* Desktop: Show delete button only */}
+                              <div className="hidden md:flex">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-9 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => setDeleteConfirmOpen(component.id)}
+                                  disabled={deletingComponent}
+                                >
+                                  <TrashIcon className="h-4 w-4 mr-2" />
+                                  Delete
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                          {/* Notes section - different on mobile vs desktop */}
+                          <div className="mt-2">
+                            {/* Mobile: Show notes button or display notes */}
+                            <div className="md:hidden">
+                              {component.notes && !editingNotesInline && (
+                                <div className="p-2 bg-gray-50 rounded border border-gray-200 w-full">
+                                  <p className="text-xs text-gray-700 whitespace-pre-wrap">
+                                    {component.notes}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                            {/* Desktop: Always show editable notes area */}
+                            <div className="hidden md:block">
+                              {editingNotesInline === component.id ? (
+                                <div className="space-y-2">
+                                  <Textarea
+                                    value={inlineNotesText}
+                                    onChange={(e) => setInlineNotesText(e.target.value)}
+                                    placeholder="Add notes..."
+                                    rows={3}
+                                    className="text-sm"
+                                    autoFocus
+                                  />
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={handleCancelInlineNotes}
+                                      disabled={savingInlineNotes}
+                                      className="h-8 text-xs"
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleSaveInlineNotes(component.id)}
+                                      disabled={savingInlineNotes}
+                                      className="h-8 text-xs"
+                                    >
+                                      {savingInlineNotes ? "Saving..." : "Save"}
+                                    </Button>
                                   </div>
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
+                                </div>
+                              ) : (
+                                <div 
+                                  className="p-2 bg-gray-50 rounded border border-gray-200 w-full cursor-text hover:bg-gray-100 transition-colors min-h-[60px]"
+                                  onClick={() => handleStartEditingNotesInline(component.id)}
+                                >
+                                  {component.notes ? (
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                                      {component.notes}
+                                    </p>
+                                  ) : (
+                                    <p className="text-sm text-gray-400 italic">
+                                      Click to add notes...
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
               </CardContent>
+              )}
             </Card>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -1406,6 +1796,188 @@ export default function AssessmentDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import Template Modal */}
+      <AssessmentImportTemplateModal
+        open={importTemplateOpen}
+        onOpenChange={setImportTemplateOpen}
+        assessmentId={assessmentId}
+        onSuccess={fetchData}
+      />
+
+      {/* Notes Modal */}
+      <Dialog open={notesModalOpen} onOpenChange={setNotesModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Notes</DialogTitle>
+            <DialogDescription>
+              Add notes for this component assessment
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="notes" className="text-xs">Notes</Label>
+              <Textarea
+                id="notes"
+                value={notesText}
+                onChange={(e) => setNotesText(e.target.value)}
+                placeholder="Enter notes..."
+                rows={6}
+                className="text-xs"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setNotesModalOpen(false)
+                setNotesComponentId(null)
+                setNotesText("")
+              }}
+              disabled={savingNotes}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveNotes}
+              disabled={savingNotes}
+            >
+              {savingNotes ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Component Dialog */}
+      {editingComponentId && editingComponent && (
+        <Dialog 
+          open={editComponentDialogOpen} 
+          onOpenChange={(open) => {
+            setEditComponentDialogOpen(open)
+            if (!open) {
+              setEditingComponentId(null)
+              setEditingComponent(null)
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Component</DialogTitle>
+              <DialogDescription>
+                Update component assessment details
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor={`edit-componentType-${editingComponentId}`} className="text-xs">
+                    Component Type *
+                  </Label>
+                  <Input
+                    id={`edit-componentType-${editingComponentId}`}
+                    value={editingComponent.componentType}
+                    onChange={(e) =>
+                      setEditingComponent({
+                        ...editingComponent,
+                        componentType: e.target.value,
+                      })
+                    }
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`edit-condition-${editingComponentId}`} className="text-xs">
+                    Condition *
+                  </Label>
+                  <Select
+                    value={editingComponent.condition}
+                    onValueChange={(value) =>
+                      setEditingComponent({
+                        ...editingComponent,
+                        condition: value,
+                      })
+                    }
+                  >
+                    <SelectTrigger id={`edit-condition-${editingComponentId}`} className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {componentStatuses.map((status) => {
+                        const color = status.color || "gray"
+                        const colorClasses = {
+                          green: "bg-green-500",
+                          orange: "bg-orange-500",
+                          blue: "bg-blue-500",
+                          red: "bg-red-500",
+                          gray: "bg-gray-500",
+                          yellow: "bg-yellow-500",
+                          purple: "bg-purple-500",
+                        }
+                        return (
+                          <SelectItem key={status.id} value={status.name}>
+                            <div className="flex items-center gap-2">
+                              <div className={cn(
+                                "w-3 h-3 rounded-full border border-gray-300",
+                                colorClasses[color as keyof typeof colorClasses] || colorClasses.gray
+                              )} />
+                              <span>{status.name}</span>
+                            </div>
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`edit-notes-${editingComponentId}`} className="text-xs">
+                  Notes
+                </Label>
+                <Textarea
+                  id={`edit-notes-${editingComponentId}`}
+                  value={editingComponent.notes}
+                  onChange={(e) =>
+                    setEditingComponent({
+                      ...editingComponent,
+                      notes: e.target.value,
+                    })
+                  }
+                  placeholder="Optional notes..."
+                  rows={4}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditingComponentId(null)
+                  setEditingComponent(null)
+                }}
+                disabled={savingComponent}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => handleSaveComponent(editingComponentId)}
+                disabled={
+                  savingComponent ||
+                  !editingComponent.componentType ||
+                  !editingComponent.condition
+                }
+              >
+                {savingComponent ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

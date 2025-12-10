@@ -57,6 +57,12 @@ export async function GET(
             },
           },
         },
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         assessment: {
           select: {
             id: true,
@@ -179,6 +185,12 @@ export async function PUT(
             },
           },
         },
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         assessment: {
           select: {
             id: true,
@@ -218,6 +230,96 @@ export async function PUT(
     console.error("Error updating selection:", error)
     return NextResponse.json(
       { error: "Failed to update selection", details: error?.message || "Unknown error" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const selectionId = params.id
+    const body = await request.json()
+    const { projectId } = body
+
+    // Verify selection exists and belongs to user's tenant
+    const existingSelection = await prisma.designProject.findFirst({
+      where: {
+        id: selectionId,
+        unit: {
+          building: {
+            community: {
+              tenantId: user.tenantId,
+            },
+          },
+        },
+      },
+      include: {
+        unit: true,
+      },
+    })
+
+    if (!existingSelection) {
+      return NextResponse.json(
+        { error: "Selection not found" },
+        { status: 404 }
+      )
+    }
+
+    // If projectId provided, verify it belongs to the same unit and tenant
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          unitId: existingSelection.unitId,
+          tenantId: user.tenantId,
+        },
+      })
+
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found or doesn't belong to this unit" },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Update selection
+    const selection = await prisma.designProject.update({
+      where: { id: selectionId },
+      data: {
+        projectId: projectId || null,
+      },
+      include: {
+        unit: {
+          include: {
+            building: {
+              include: {
+                community: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    return NextResponse.json(selection)
+  } catch (error: any) {
+    console.error("Error updating selection:", error)
+    return NextResponse.json(
+      { error: "Failed to update selection" },
       { status: 500 }
     )
   }

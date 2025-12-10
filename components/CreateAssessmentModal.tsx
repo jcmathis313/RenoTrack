@@ -32,6 +32,12 @@ interface Unit {
   }
 }
 
+interface Project {
+  id: string
+  name: string
+  unitId: string
+}
+
 interface CreateAssessmentModalProps {
   open: boolean
   onClose: () => void
@@ -46,12 +52,14 @@ export function CreateAssessmentModal({
   initialUnitId,
 }: CreateAssessmentModalProps) {
   const [units, setUnits] = useState<Unit[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
   const [formData, setFormData] = useState({
     unitId: initialUnitId || "",
+    projectId: "",
     assessedAt: new Date().toISOString().split("T")[0],
   })
 
@@ -67,11 +75,19 @@ export function CreateAssessmentModal({
   const fetchData = async () => {
     setLoading(true)
     try {
-      const unitsResponse = await fetch("/api/units")
+      const [unitsResponse, projectsResponse] = await Promise.all([
+        fetch("/api/units"),
+        fetch("/api/projects"),
+      ])
 
       if (unitsResponse.ok) {
         const unitsData = await unitsResponse.json()
         setUnits(unitsData)
+      }
+
+      if (projectsResponse.ok) {
+        const projectsData = await projectsResponse.json()
+        setProjects(projectsData)
       }
     } catch (error) {
       console.error("Error fetching data:", error)
@@ -80,6 +96,11 @@ export function CreateAssessmentModal({
       setLoading(false)
     }
   }
+
+  // Get projects for the selected unit
+  const availableProjects = projects.filter(
+    (p) => p.unitId === formData.unitId
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -94,6 +115,7 @@ export function CreateAssessmentModal({
         },
         body: JSON.stringify({
           unitId: formData.unitId,
+          projectId: formData.projectId || undefined,
           assessedAt: formData.assessedAt || new Date().toISOString(),
         }),
       })
@@ -133,7 +155,7 @@ export function CreateAssessmentModal({
               <Select
                 value={formData.unitId}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, unitId: value })
+                  setFormData({ ...formData, unitId: value, projectId: "" })
                 }
                 disabled={loading}
               >
@@ -150,6 +172,33 @@ export function CreateAssessmentModal({
               </Select>
             </div>
 
+
+            <div className="space-y-2">
+              <Label htmlFor="projectId">Project (Optional)</Label>
+              <Select
+                value={formData.projectId || undefined}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, projectId: value })
+                }
+                disabled={loading || !formData.unitId}
+              >
+                <SelectTrigger id="projectId">
+                  <SelectValue placeholder="Select a project (optional)" />
+                </SelectTrigger>
+                  <SelectContent>
+                    {availableProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+              </Select>
+              {formData.unitId && availableProjects.length === 0 && (
+                <p className="text-xs text-gray-500">
+                  No projects available for this unit
+                </p>
+              )}
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="assessedAt">Assessment Date *</Label>

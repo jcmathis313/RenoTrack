@@ -143,13 +143,30 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { designProjectId } = body
+    const { designProjectId, projectId } = body
 
     if (!designProjectId) {
       return NextResponse.json(
         { error: "Design Project ID is required" },
         { status: 400 }
       )
+    }
+
+    // If projectId provided, verify it belongs to the same tenant
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          tenantId: user.tenantId,
+        },
+      })
+
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found or access denied" },
+          { status: 400 }
+        )
+      }
     }
 
     // Get current user's name for inspectedBy
@@ -199,6 +216,7 @@ export async function POST(request: NextRequest) {
     const inspection = await prisma.inspection.create({
       data: {
         designProjectId,
+        projectId: projectId || null,
         inspectedBy: inspectedByName,
         inspectionRooms: {
           create: designProject.designRooms.map((room: any, roomIndex: number) => ({

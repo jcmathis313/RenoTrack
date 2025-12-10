@@ -52,6 +52,12 @@ export async function GET(
                 },
               },
             },
+            project: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
             designRooms: {
               include: {
                 designComponents: {
@@ -334,6 +340,108 @@ export async function DELETE(
         error: "Failed to delete inspection",
         details: error?.message || "Unknown error"
       },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  try {
+    const resolvedParams = await Promise.resolve(params)
+    const { id } = resolvedParams
+    
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { projectId } = body
+
+    // Verify inspection exists and belongs to user's tenant
+    const existingInspection = await prisma.inspection.findFirst({
+      where: {
+        id,
+        designProject: {
+          unit: {
+            building: {
+              community: {
+                tenantId: user.tenantId,
+              },
+            },
+          },
+        },
+      },
+      include: {
+        designProject: {
+          include: {
+            unit: true,
+          },
+        },
+      },
+    })
+
+    if (!existingInspection) {
+      return NextResponse.json(
+        { error: "Inspection not found" },
+        { status: 404 }
+      )
+    }
+
+    // If projectId provided, verify it belongs to the same tenant
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          unitId: existingInspection.designProject.unitId,
+          tenantId: user.tenantId,
+        },
+      })
+
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found or doesn't belong to this unit" },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Update inspection
+    const inspection = await prisma.inspection.update({
+      where: { id },
+      data: {
+        projectId: projectId || null,
+      },
+      include: {
+        designProject: {
+          include: {
+            unit: {
+              include: {
+                building: {
+                  include: {
+                    community: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    return NextResponse.json(inspection)
+  } catch (error: any) {
+    console.error("Error updating inspection:", error)
+    return NextResponse.json(
+      { error: "Failed to update inspection" },
       { status: 500 }
     )
   }

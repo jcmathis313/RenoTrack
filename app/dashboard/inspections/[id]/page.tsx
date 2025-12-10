@@ -76,6 +76,11 @@ interface Inspection {
   inspectedBy: string | null
   inspectedAt: string
   status: string | null
+  projectId: string | null
+  project?: {
+    id: string
+    name: string
+  } | null
   designProject: {
     id: string
     name: string
@@ -117,6 +122,9 @@ export default function InspectionDetailPage() {
   const [deleteRoomConfirmOpen, setDeleteRoomConfirmOpen] = useState<string | null>(null)
   const [deletingRoom, setDeletingRoom] = useState(false)
   const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null)
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
+  const [savingProject, setSavingProject] = useState(false)
 
   useEffect(() => {
     if (inspectionId) {
@@ -149,6 +157,16 @@ export default function InspectionDetailPage() {
       if (response.ok) {
         const data = await response.json()
         setInspection(data)
+        setCurrentProjectId(data.projectId || null)
+        
+        // Fetch projects for this unit
+        if (data.designProject?.unit?.id) {
+          const projectsResponse = await fetch(`/api/projects?unitId=${data.designProject.unit.id}`)
+          if (projectsResponse.ok) {
+            const projectsData = await projectsResponse.json()
+            setProjects(projectsData)
+          }
+        }
       }
     } catch (error) {
       console.error("Error fetching inspection:", error)
@@ -539,6 +557,29 @@ export default function InspectionDetailPage() {
     )
   }
 
+  const handleProjectChange = async (projectId: string) => {
+    setSavingProject(true)
+    try {
+      const response = await fetch(`/api/inspections/${inspectionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: projectId || null }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update project association")
+      }
+
+      setCurrentProjectId(projectId || null)
+      router.refresh()
+    } catch (error) {
+      console.error("Error updating project:", error)
+      alert("Failed to update project association")
+    } finally {
+      setSavingProject(false)
+    }
+  }
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -606,7 +647,7 @@ export default function InspectionDetailPage() {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-x-4 gap-y-2">
             <div>
               <Label className="text-gray-500 text-xs">Community</Label>
               <p className="text-xs font-medium mt-0.5">{inspection.designProject.unit.building.community.name}</p>
@@ -645,6 +686,27 @@ export default function InspectionDetailPage() {
                   <SelectItem value="complete">Complete</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label className="text-gray-500 text-xs">Project</Label>
+              <div className="mt-0.5">
+                <Select
+                  value={currentProjectId || undefined}
+                  onValueChange={handleProjectChange}
+                  disabled={savingProject || projects.length === 0}
+                >
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue placeholder="No project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <Label className="text-gray-500 text-xs">Statistics</Label>

@@ -70,6 +70,12 @@ export async function GET(
             },
           },
         },
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         rooms: {
           include: {
             componentAssessments: {
@@ -103,6 +109,96 @@ export async function GET(
     })
     return NextResponse.json(
       { error: "Failed to fetch assessment", details: error?.message || "Unknown error" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const assessmentId = params.id
+    const body = await request.json()
+    const { projectId } = body
+
+    // Verify assessment exists and belongs to user's tenant
+    const existingAssessment = await prisma.assessment.findFirst({
+      where: {
+        id: assessmentId,
+        unit: {
+          building: {
+            community: {
+              tenantId: user.tenantId,
+            },
+          },
+        },
+      },
+      include: {
+        unit: true,
+      },
+    })
+
+    if (!existingAssessment) {
+      return NextResponse.json(
+        { error: "Assessment not found" },
+        { status: 404 }
+      )
+    }
+
+    // If projectId provided, verify it belongs to the same unit and tenant
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          unitId: existingAssessment.unitId,
+          tenantId: user.tenantId,
+        },
+      })
+
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found or doesn't belong to this unit" },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Update assessment
+    const assessment = await prisma.assessment.update({
+      where: { id: assessmentId },
+      data: {
+        projectId: projectId || null,
+      },
+      include: {
+        unit: {
+          include: {
+            building: {
+              include: {
+                community: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    return NextResponse.json(assessment)
+  } catch (error: any) {
+    console.error("Error updating assessment:", error)
+    return NextResponse.json(
+      { error: "Failed to update assessment" },
       { status: 500 }
     )
   }

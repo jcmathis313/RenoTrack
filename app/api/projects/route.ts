@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma"
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
@@ -19,19 +18,12 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     const where: any = {
-      unit: {
-        building: {
-          community: {
-            tenantId: user.tenantId,
-          },
-        },
-      },
+      tenantId: user.tenantId,
     }
 
-    // If unitId is provided, filter by it
     if (unitId) {
       where.unitId = unitId
-      // Also verify unit belongs to user's tenant
+      // Verify unit belongs to user's tenant
       const unit = await prisma.unit.findFirst({
         where: {
           id: unitId,
@@ -51,8 +43,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get all assessments for units belonging to the user's tenant
-    const assessments = await prisma.assessment.findMany({
+    const projects = await prisma.project.findMany({
       where,
       include: {
         unit: {
@@ -69,31 +60,36 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        rooms: {
+        assignments: {
           include: {
-            _count: {
+            user: {
               select: {
-                componentAssessments: true,
+                id: true,
+                name: true,
+                email: true,
+                role: true,
               },
             },
           },
         },
         _count: {
           select: {
-            rooms: true,
+            assessments: true,
+            selections: true,
+            inspections: true,
           },
         },
       },
       orderBy: {
-        createdAt: "desc",
+        updatedAt: "desc",
       },
     })
 
-    return NextResponse.json(assessments)
+    return NextResponse.json(projects)
   } catch (error: any) {
-    console.error("Error fetching assessments:", error)
+    console.error("Error fetching projects:", error)
     return NextResponse.json(
-      { error: "Failed to fetch assessments" },
+      { error: "Failed to fetch projects", details: error?.message || String(error) },
       { status: 500 }
     )
   }
@@ -107,11 +103,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { unitId, assessedBy, assessedAt, projectId } = body
+    const { unitId, name, notes, assignedUserIds } = body
 
-    if (!unitId) {
+    if (!unitId || !name) {
       return NextResponse.json(
-        { error: "Unit ID is required" },
+        { error: "Unit ID and name are required" },
         { status: 400 }
       )
     }
@@ -135,37 +131,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // If projectId provided, verify it belongs to the same unit and tenant
-    if (projectId) {
-      const project = await prisma.project.findFirst({
+    // Verify assigned users belong to the same tenant
+    if (assignedUserIds && assignedUserIds.length > 0) {
+      const users = await prisma.user.findMany({
         where: {
-          id: projectId,
-          unitId: unitId,
+          id: { in: assignedUserIds },
           tenantId: user.tenantId,
         },
       })
 
-      if (!project) {
+      if (users.length !== assignedUserIds.length) {
         return NextResponse.json(
-          { error: "Project not found or doesn't belong to this unit" },
+          { error: "One or more assigned users not found or access denied" },
           { status: 400 }
         )
       }
     }
 
-    // Get current user's name for assessedBy
-    const currentUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { name: true, email: true },
-    })
-    const assessedByName = currentUser?.name || currentUser?.email || user.email
-
-    const assessment = await prisma.assessment.create({
+    // Create project with assignments if provided
+    const project = await prisma.project.create({
       data: {
         unitId,
-        projectId: projectId || null,
-        assessedBy: assessedByName,
-        assessedAt: assessedAt ? new Date(assessedAt) : new Date(),
+        tenantId: user.tenantId,
+        name: name.trim(),
+        notes: notes?.trim() || null,
+        assignments: assignedUserIds && assignedUserIds.length > 0
+          ? {
+              create: assignedUserIds.map((userId: string) => ({
+                userId,
+              })),
+            }
+          : undefined,
       },
       include: {
         unit: {
@@ -182,14 +178,33 @@ export async function POST(request: NextRequest) {
             },
           },
         },
+        assignments: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            assessments: true,
+            selections: true,
+            inspections: true,
+          },
+        },
       },
     })
 
-    return NextResponse.json(assessment, { status: 201 })
+    return NextResponse.json(project, { status: 201 })
   } catch (error: any) {
-    console.error("Error creating assessment:", error)
+    console.error("Error creating project:", error)
     return NextResponse.json(
-      { error: "Failed to create assessment" },
+      { error: "Failed to create project", details: error?.message || String(error) },
       { status: 500 }
     )
   }

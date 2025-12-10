@@ -50,6 +50,12 @@ interface Assessment {
   }
 }
 
+interface Project {
+  id: string
+  name: string
+  unitId: string
+}
+
 interface CreateSelectionModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -64,6 +70,7 @@ export function CreateSelectionModal({
   const [createMode, setCreateMode] = useState<"assessment" | "scratch">("assessment")
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [units, setUnits] = useState<Unit[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -73,6 +80,7 @@ export function CreateSelectionModal({
     assessmentId: "",
     unitId: "",
     name: "",
+    projectId: "",
   })
 
   useEffect(() => {
@@ -83,6 +91,7 @@ export function CreateSelectionModal({
         assessmentId: "",
         unitId: "",
         name: "",
+        projectId: "",
       })
       setAssessmentSearch("")
       setError("")
@@ -93,9 +102,10 @@ export function CreateSelectionModal({
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [assessmentsResponse, unitsResponse] = await Promise.all([
+      const [assessmentsResponse, unitsResponse, projectsResponse] = await Promise.all([
         fetch("/api/assessments"),
         fetch("/api/units"),
+        fetch("/api/projects"),
       ])
 
       if (assessmentsResponse.ok) {
@@ -107,6 +117,11 @@ export function CreateSelectionModal({
         const unitsData = await unitsResponse.json()
         setUnits(unitsData)
       }
+
+      if (projectsResponse.ok) {
+        const projectsData = await projectsResponse.json()
+        setProjects(projectsData)
+      }
     } catch (error) {
       console.error("Error fetching data:", error)
       setError("Failed to load data")
@@ -114,6 +129,15 @@ export function CreateSelectionModal({
       setLoading(false)
     }
   }
+
+  const selectedAssessment = assessments.find((a) => a.id === formData.assessmentId)
+
+  // Get projects for the selected unit
+  const availableProjects = projects.filter(
+    (p) => p.unitId === (createMode === "assessment" && selectedAssessment
+      ? selectedAssessment.unit.id
+      : formData.unitId)
+  )
 
   const filteredAssessments = assessments.filter((assessment) => {
     if (!assessmentSearch) return true
@@ -134,6 +158,7 @@ export function CreateSelectionModal({
     try {
       let submitData: any = {
         name: formData.name.trim(),
+        projectId: formData.projectId || undefined,
       }
 
       if (createMode === "assessment") {
@@ -194,7 +219,6 @@ export function CreateSelectionModal({
     }
   }
 
-  const selectedAssessment = assessments.find((a) => a.id === formData.assessmentId)
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -307,6 +331,33 @@ export function CreateSelectionModal({
                   placeholder="Optional - defaults to 'Selections for Unit X'"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="projectId">Project (Optional)</Label>
+                <Select
+                  value={formData.projectId || undefined}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, projectId: value })
+                  }
+                  disabled={!selectedAssessment}
+                >
+                  <SelectTrigger id="projectId">
+                    <SelectValue placeholder="Select a project (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedAssessment && availableProjects.length === 0 && (
+                  <p className="text-xs text-gray-500">
+                    No projects available for this unit
+                  </p>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -314,7 +365,7 @@ export function CreateSelectionModal({
                 <Label htmlFor="unit">Unit *</Label>
                 <Select
                   value={formData.unitId}
-                  onValueChange={(value) => setFormData({ ...formData, unitId: value })}
+                  onValueChange={(value) => setFormData({ ...formData, unitId: value, projectId: "" })}
                 >
                   <SelectTrigger id="unit">
                     <SelectValue placeholder="Select a unit" />
@@ -343,6 +394,33 @@ export function CreateSelectionModal({
                   placeholder="Enter selection meeting name"
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="projectId">Project (Optional)</Label>
+                <Select
+                  value={formData.projectId || undefined}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, projectId: value })
+                  }
+                  disabled={!formData.unitId}
+                >
+                  <SelectTrigger id="projectId">
+                    <SelectValue placeholder="Select a project (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formData.unitId && availableProjects.length === 0 && (
+                  <p className="text-xs text-gray-500">
+                    No projects available for this unit
+                  </p>
+                )}
               </div>
             </>
           )}

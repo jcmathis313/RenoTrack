@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { unitId, assessmentId, name, status } = body
+    const { unitId, assessmentId, name, status, projectId } = body
 
     if (!unitId || !name) {
       return NextResponse.json(
@@ -144,6 +144,24 @@ export async function POST(request: NextRequest) {
         { error: "Unit not found or access denied" },
         { status: 404 }
       )
+    }
+
+    // If projectId provided, verify it belongs to the same unit and tenant
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          unitId: unitId,
+          tenantId: user.tenantId,
+        },
+      })
+
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found or doesn't belong to this unit" },
+          { status: 400 }
+        )
+      }
     }
 
     // If assessmentId provided, verify it belongs to the same unit and fetch its data
@@ -183,6 +201,7 @@ export async function POST(request: NextRequest) {
     const selection = await prisma.designProject.create({
       data: {
         unitId,
+        projectId: projectId || null,
         assessmentId: assessmentId || null,
         name: name.trim(),
         status: status || "Draft",

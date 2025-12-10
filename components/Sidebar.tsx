@@ -16,6 +16,7 @@ import {
   ClipboardDocumentListIcon,
   UserCircleIcon,
   ArrowPathIcon,
+  FolderIcon,
 } from "@heroicons/react/24/outline"
 
 interface Community {
@@ -33,6 +34,7 @@ interface Building {
 
 const topLevelNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
+  { name: "Projects", href: "/dashboard/projects", icon: FolderIcon },
   { name: "Assessments", href: "/dashboard/assessments", icon: ClipboardDocumentCheckIcon },
   { name: "Selections", href: "/dashboard/selections", icon: PaintBrushIcon },
   { name: "Inspections", href: "/dashboard/inspections", icon: ClipboardDocumentListIcon },
