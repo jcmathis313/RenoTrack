@@ -176,8 +176,8 @@ export default function ProjectDetailPage() {
         setEditData({
           name: data.name,
           notes: data.notes || "",
-          vacancyDate: "",
-          moveInDate: "",
+          vacancyDate: data.vacancyDate ? new Date(data.vacancyDate).toISOString().split("T")[0] : "",
+          moveInDate: data.moveInDate ? new Date(data.moveInDate).toISOString().split("T")[0] : "",
         })
         setDateData({
           vacancyDate: data.vacancyDate ? new Date(data.vacancyDate).toISOString().split("T")[0] : "",
@@ -218,8 +218,8 @@ export default function ProjectDetailPage() {
       setEditData({
         name: updated.name,
         notes: updated.notes || "",
-        vacancyDate: "",
-        moveInDate: "",
+        vacancyDate: updated.vacancyDate ? new Date(updated.vacancyDate).toISOString().split("T")[0] : "",
+        moveInDate: updated.moveInDate ? new Date(updated.moveInDate).toISOString().split("T")[0] : "",
       })
       setEditing(false)
       router.refresh()
@@ -693,10 +693,13 @@ export default function ProjectDetailPage() {
                     variant="outline"
                     onClick={() => {
                       setEditing(false)
-                      setEditData({
+                      setEditData((prev) => ({
+                        ...prev,
                         name: project.name,
                         notes: project.notes || "",
-                      })
+                        vacancyDate: project.vacancyDate ? new Date(project.vacancyDate).toISOString().split("T")[0] : "",
+                        moveInDate: project.moveInDate ? new Date(project.moveInDate).toISOString().split("T")[0] : "",
+                      }))
                       setError("")
                     }}
                     disabled={saving}
