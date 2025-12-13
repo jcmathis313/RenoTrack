@@ -48,6 +48,8 @@
 /* Fixed table layout for consistent column alignment */
 table.table-fixed {
   table-layout: fixed;
+  /* Allow table to grow beyond 100% width when columns are resized */
+  min-width: 100%;
 }
 
 table.table-fixed td,
@@ -55,6 +57,8 @@ table.table-fixed th {
   overflow: hidden;
   text-overflow: ellipsis;
   word-wrap: break-word;
+  /* Ensure columns respect min-width and don't shrink below it */
+  box-sizing: border-box;
 }
 
 /* Sonner toast custom styling */

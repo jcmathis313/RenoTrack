@@ -1220,132 +1220,84 @@ export default function AssessmentDetailPage() {
                         <div
                           key={component.id}
                           className={cn(
-                            "flex flex-col gap-2 sm:gap-3 p-3 md:p-4 hover:bg-gray-50 transition-colors",
+                            "flex flex-col md:grid md:grid-cols-3 gap-2 sm:gap-3 md:gap-4 p-3 md:p-4 hover:bg-gray-50 transition-colors",
                             colorClasses[color as keyof typeof colorClasses]?.replace("text-", "bg-").replace("-700", "-50/50") || "bg-gray-50/50"
                           )}
                         >
-                          <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-2">
-                            <div className="flex-1 min-w-0 w-full sm:w-auto">
-                              {/* Breadcrumb */}
-                              <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
-                                <span>{room.name}</span>
-                                <ChevronRightIcon className="h-3 w-3" />
-                                <span>{component.componentType}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="font-semibold text-sm md:text-base">
-                                  {component.componentType}
-                                  {component.componentName && component.componentName !== component.componentType && (
-                                    <span className="text-gray-500 ml-1 font-normal">- {component.componentName}</span>
-                                  )}
-                                </div>
-                                {/* Edit icon - visible on md and up */}
-                                <button
-                                  onClick={() => {
-                                    setEditingComponentId(component.id)
-                                    setEditingComponent({
-                                      componentType: component.componentType,
-                                      condition: component.condition,
-                                      notes: component.notes || "",
-                                    })
-                                    setEditComponentDialogOpen(true)
-                                  }}
-                                  className="hidden md:flex items-center justify-center h-6 w-6 rounded hover:bg-gray-100 transition-colors"
-                                  title="Edit component"
-                                >
-                                  <PencilIcon className="h-4 w-4 text-gray-500" />
-                                </button>
-                              </div>
+                          {/* Column 1: Title and Breadcrumbs */}
+                          <div className="flex-1 min-w-0">
+                            {/* Breadcrumb */}
+                            <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+                              <span>{room.name}</span>
+                              <ChevronRightIcon className="h-3 w-3" />
+                              <span>{component.componentType}</span>
                             </div>
-                            <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto">
-                              <div className="flex flex-wrap gap-1.5 md:gap-2">
-                                {componentStatuses.map((statusOption) => {
-                                  const isSelected = component.condition === statusOption.name
-                                  const statusColor = statusOption.color || "gray"
-                                  const buttonColorClasses = {
-                                    green: isSelected ? "bg-green-600 hover:bg-green-700 text-white" : "border-green-300 text-green-700 hover:bg-green-50",
-                                    orange: isSelected ? "bg-orange-600 hover:bg-orange-700 text-white" : "border-orange-300 text-orange-700 hover:bg-orange-50",
-                                    blue: isSelected ? "bg-blue-600 hover:bg-blue-700 text-white" : "border-blue-300 text-blue-700 hover:bg-blue-50",
-                                    red: isSelected ? "bg-red-600 hover:bg-red-700 text-white" : "border-red-300 text-red-700 hover:bg-red-50",
-                                    gray: isSelected ? "bg-gray-600 hover:bg-gray-700 text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50",
-                                    yellow: isSelected ? "bg-yellow-600 hover:bg-yellow-700 text-white" : "border-yellow-300 text-yellow-700 hover:bg-yellow-50",
-                                    purple: isSelected ? "bg-purple-600 hover:bg-purple-700 text-white" : "border-purple-300 text-purple-700 hover:bg-purple-50",
-                                  }
-                                  return (
-                                    <Button
-                                      key={statusOption.id}
-                                      size="sm"
-                                      variant={isSelected ? "default" : "outline"}
-                                      className={cn(
-                                        "min-w-[50px] sm:min-w-[60px] md:min-w-[80px] h-8 sm:h-9 md:h-10 text-xs font-semibold px-2 md:px-3",
-                                        buttonColorClasses[statusColor as keyof typeof buttonColorClasses] || buttonColorClasses.gray
-                                      )}
-                                      onClick={() => handleConditionChange(component.id, statusOption.name)}
-                                      disabled={updatingCondition === component.id}
-                                    >
-                                      {updatingCondition === component.id && isSelected ? "..." : statusOption.name}
-                                    </Button>
-                                  )
-                                })}
+                            <div className="flex items-center gap-2">
+                              <div className="font-semibold text-sm md:text-base">
+                                {component.componentType}
+                                {component.componentName && component.componentName !== component.componentType && (
+                                  <span className="text-gray-500 ml-1 font-normal">- {component.componentName}</span>
+                                )}
                               </div>
-                              {/* Mobile: Show buttons */}
-                              <div className="flex flex-col gap-2 md:hidden">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-9 text-xs font-semibold w-full min-w-[100px]"
-                                  onClick={() => handleNotesClick(component.id)}
-                                >
-                                  <PencilIcon className="h-4 w-4 mr-2" />
-                                  Notes
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-9 text-xs font-semibold w-full min-w-[100px]"
-                                  onClick={() => {
-                                    setEditingComponentId(component.id)
-                                    setEditingComponent({
-                                      componentType: component.componentType,
-                                      condition: component.condition,
-                                      notes: component.notes || "",
-                                    })
-                                    setEditComponentDialogOpen(true)
-                                  }}
-                                >
-                                  <PencilIcon className="h-4 w-4 mr-2" />
-                                  Edit
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-9 text-xs font-semibold w-full min-w-[100px] text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  onClick={() => setDeleteConfirmOpen(component.id)}
-                                  disabled={deletingComponent}
-                                >
-                                  <TrashIcon className="h-4 w-4 mr-2" />
-                                  Delete
-                                </Button>
-                              </div>
-                              {/* Desktop: Show delete button only */}
-                              <div className="hidden md:flex">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-9 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  onClick={() => setDeleteConfirmOpen(component.id)}
-                                  disabled={deletingComponent}
-                                >
-                                  <TrashIcon className="h-4 w-4 mr-2" />
-                                  Delete
-                                </Button>
-                              </div>
+                              {/* Edit icon - visible on md and up */}
+                              <button
+                                onClick={() => {
+                                  setEditingComponentId(component.id)
+                                  setEditingComponent({
+                                    componentType: component.componentType,
+                                    condition: component.condition,
+                                    notes: component.notes || "",
+                                  })
+                                  setEditComponentDialogOpen(true)
+                                }}
+                                className="hidden md:flex items-center justify-center h-6 w-6 rounded hover:bg-gray-100 transition-colors"
+                                title="Edit component"
+                              >
+                                <PencilIcon className="h-4 w-4 text-gray-500" />
+                              </button>
                             </div>
-                          </div>
-                          {/* Notes section - different on mobile vs desktop */}
-                          <div className="mt-2">
-                            {/* Mobile: Show notes button or display notes */}
-                            <div className="md:hidden">
+                            {/* Delete icon - below title */}
+                            <div className="mt-1">
+                              <button
+                                onClick={() => setDeleteConfirmOpen(component.id)}
+                                disabled={deletingComponent}
+                                className="flex items-center justify-center h-6 w-6 rounded hover:bg-red-50 transition-colors text-red-600 hover:text-red-700"
+                                title="Delete component"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                            {/* Mobile: Show action buttons below title */}
+                            <div className="flex flex-col gap-2 mt-2 md:hidden">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-9 text-xs font-semibold w-full min-w-[100px]"
+                                onClick={() => handleNotesClick(component.id)}
+                              >
+                                <PencilIcon className="h-4 w-4 mr-2" />
+                                Notes
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-9 text-xs font-semibold w-full min-w-[100px]"
+                                onClick={() => {
+                                  setEditingComponentId(component.id)
+                                  setEditingComponent({
+                                    componentType: component.componentType,
+                                    condition: component.condition,
+                                    notes: component.notes || "",
+                                  })
+                                  setEditComponentDialogOpen(true)
+                                }}
+                              >
+                                <PencilIcon className="h-4 w-4 mr-2" />
+                                Edit
+                              </Button>
+                            </div>
+                            {/* Mobile: Show notes below title */}
+                            <div className="mt-2 md:hidden">
                               {component.notes && !editingNotesInline && (
                                 <div className="p-2 bg-gray-50 rounded border border-gray-200 w-full">
                                   <p className="text-xs text-gray-700 whitespace-pre-wrap">
@@ -1354,54 +1306,89 @@ export default function AssessmentDetailPage() {
                                 </div>
                               )}
                             </div>
-                            {/* Desktop: Always show editable notes area */}
-                            <div className="hidden md:block">
-                              {editingNotesInline === component.id ? (
-                                <div className="space-y-2">
-                                  <Textarea
-                                    value={inlineNotesText}
-                                    onChange={(e) => setInlineNotesText(e.target.value)}
-                                    placeholder="Add notes..."
-                                    rows={3}
-                                    className="text-sm"
-                                    autoFocus
-                                  />
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={handleCancelInlineNotes}
-                                      disabled={savingInlineNotes}
-                                      className="h-8 text-xs"
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleSaveInlineNotes(component.id)}
-                                      disabled={savingInlineNotes}
-                                      className="h-8 text-xs"
-                                    >
-                                      {savingInlineNotes ? "Saving..." : "Save"}
-                                    </Button>
-                                  </div>
+                          </div>
+
+                          {/* Column 2: Notes Section (Desktop only) */}
+                          <div className="hidden md:flex md:flex-col md:justify-start">
+                            {editingNotesInline === component.id ? (
+                              <div className="space-y-2">
+                                <Textarea
+                                  value={inlineNotesText}
+                                  onChange={(e) => setInlineNotesText(e.target.value)}
+                                  placeholder="Add notes..."
+                                  rows={3}
+                                  className="text-sm"
+                                  autoFocus
+                                />
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleCancelInlineNotes}
+                                    disabled={savingInlineNotes}
+                                    className="h-8 text-xs"
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSaveInlineNotes(component.id)}
+                                    disabled={savingInlineNotes}
+                                    className="h-8 text-xs"
+                                  >
+                                    {savingInlineNotes ? "Saving..." : "Save"}
+                                  </Button>
                                 </div>
-                              ) : (
-                                <div 
-                                  className="p-2 bg-gray-50 rounded border border-gray-200 w-full cursor-text hover:bg-gray-100 transition-colors min-h-[60px]"
-                                  onClick={() => handleStartEditingNotesInline(component.id)}
-                                >
-                                  {component.notes ? (
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                                      {component.notes}
-                                    </p>
-                                  ) : (
-                                    <p className="text-sm text-gray-400 italic">
-                                      Click to add notes...
-                                    </p>
-                                  )}
-                                </div>
-                              )}
+                              </div>
+                            ) : (
+                              <div 
+                                className="p-2 bg-gray-50 rounded border border-gray-200 w-full cursor-text hover:bg-gray-100 transition-colors min-h-[60px]"
+                                onClick={() => handleStartEditingNotesInline(component.id)}
+                              >
+                                {component.notes ? (
+                                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                                    {component.notes}
+                                  </p>
+                                ) : (
+                                  <p className="text-sm text-gray-400 italic">
+                                    Click to add notes...
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Column 3: Assessment Condition */}
+                          <div className="flex flex-col gap-2 md:justify-start">
+                            <div className="flex flex-wrap gap-1.5 md:gap-2">
+                              {componentStatuses.map((statusOption) => {
+                                const isSelected = component.condition === statusOption.name
+                                const statusColor = statusOption.color || "gray"
+                                const buttonColorClasses = {
+                                  green: isSelected ? "bg-green-600 hover:bg-green-700 text-white" : "border-green-300 text-green-700 hover:bg-green-50",
+                                  orange: isSelected ? "bg-orange-600 hover:bg-orange-700 text-white" : "border-orange-300 text-orange-700 hover:bg-orange-50",
+                                  blue: isSelected ? "bg-blue-600 hover:bg-blue-700 text-white" : "border-blue-300 text-blue-700 hover:bg-blue-50",
+                                  red: isSelected ? "bg-red-600 hover:bg-red-700 text-white" : "border-red-300 text-red-700 hover:bg-red-50",
+                                  gray: isSelected ? "bg-gray-600 hover:bg-gray-700 text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50",
+                                  yellow: isSelected ? "bg-yellow-600 hover:bg-yellow-700 text-white" : "border-yellow-300 text-yellow-700 hover:bg-yellow-50",
+                                  purple: isSelected ? "bg-purple-600 hover:bg-purple-700 text-white" : "border-purple-300 text-purple-700 hover:bg-purple-50",
+                                }
+                                return (
+                                  <Button
+                                    key={statusOption.id}
+                                    size="sm"
+                                    variant={isSelected ? "default" : "outline"}
+                                    className={cn(
+                                      "min-w-[50px] sm:min-w-[60px] md:min-w-[80px] h-8 sm:h-9 md:h-10 text-xs font-semibold px-2 md:px-3",
+                                      buttonColorClasses[statusColor as keyof typeof buttonColorClasses] || buttonColorClasses.gray
+                                    )}
+                                    onClick={() => handleConditionChange(component.id, statusOption.name)}
+                                    disabled={updatingCondition === component.id}
+                                  >
+                                    {updatingCondition === component.id && isSelected ? "..." : statusOption.name}
+                                  </Button>
+                                )
+                              })}
                             </div>
                           </div>
                         </div>

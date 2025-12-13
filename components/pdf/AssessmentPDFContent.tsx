@@ -1,5 +1,7 @@
 "use client"
 
+import React from "react"
+
 interface ComponentStatus {
   id: string
   name: string
@@ -78,6 +80,8 @@ export default function AssessmentPDFContent({
 }: AssessmentPDFContentProps) {
   const companyName = tenantSettings?.companyName || "Your Company"
   const businessAddress = tenantSettings?.businessAddress || ""
+  const accentColor = "#111827" // Black for monochrome theme
+
   const generatedAt = new Date().toLocaleString("en-US", {
     year: "numeric",
     month: "long",
@@ -92,132 +96,153 @@ export default function AssessmentPDFContent({
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         color: "#1f2937",
-        lineHeight: 1.6,
+        lineHeight: 1.35,
+        fontSize: "8pt",
       }}
     >
       {/* PDF Header */}
       <div className="pdf-header">
-        <div className="pdf-title">Assessment Report</div>
-        <div className="pdf-subtitle">
-          {assessment.unit.building.community.name} - {assessment.unit.building.name} - Unit {assessment.unit.number}
-        </div>
-        <div className="pdf-meta">
+        <div className="pdf-header-main">
           <div>
-            <strong>Community:</strong> {assessment.unit.building.community.name}
-          </div>
-          <div>
-            <strong>Building:</strong> {assessment.unit.building.name}
-          </div>
-          <div>
-            <strong>Unit:</strong> {assessment.unit.number}
-          </div>
-          <div>
-            <strong>Assessment Date:</strong> {new Date(assessment.assessedAt).toLocaleDateString()}
-          </div>
-          <div>
-            <strong>Assessed By:</strong> {assessment.assessedBy || "N/A"}
-          </div>
-        </div>
-      </div>
-
-      {/* Company Info */}
-      <div className="pdf-section">
-        <div className="text-muted" style={{ fontSize: "0.875rem" }}>
-          <div>{companyName}</div>
-          {businessAddress && <div>{businessAddress}</div>}
-          <div style={{ marginTop: "0.5rem" }}>Generated: {generatedAt}</div>
-        </div>
-      </div>
-
-      {/* Rooms and Components */}
-      {assessment.rooms.map((room, roomIndex) => (
-        <div key={room.id} className="pdf-section">
-          <div className="room-card">
-            <div className="room-header">
-              Room {roomIndex + 1}: {room.name}
+            <div className="pdf-eyebrow" style={{ color: accentColor }}>
+              Assessment Report
             </div>
-            {room.componentAssessments.length > 0 ? (
-              <table className="component-table">
-                <thead>
-                  <tr>
-                    <th>Component / Type</th>
-                    <th>Condition</th>
-                    <th>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {room.componentAssessments.map((component) => (
-                    <tr key={component.id}>
-                      <td>
-                        <div>{component.componentType}</div>
-                        {component.componentName && (
-                          <div className="text-muted" style={{ fontSize: "0.75rem" }}>
-                            {component.componentName}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        {component.condition ? (
-                          <span
-                            className="status-badge"
-                            style={{
-                              backgroundColor: getStatusColor(component.condition, componentStatuses),
-                            }}
-                          >
-                            {component.condition}
-                          </span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td>
-                        {component.notes ? (
-                          <div style={{ fontSize: "0.75rem" }}>{component.notes}</div>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="text-muted">No components assessed in this room.</div>
-            )}
+            <div className="pdf-title">
+              {assessment.unit.building.community.name} - {assessment.unit.building.name} - Unit {assessment.unit.number}
+            </div>
+            <div className="pdf-subtitle">Generated {generatedAt}</div>
+          </div>
+          {assessment.unit.building.community.logoUrl && (
+            <div className="pdf-logo-wrap">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={assessment.unit.building.community.logoUrl}
+                alt={`${assessment.unit.building.community.name} logo`}
+                className="pdf-logo-image"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="pdf-meta-grid">
+          <div>
+            <div className="pdf-meta-label">Community</div>
+            <div className="pdf-meta-value">{assessment.unit.building.community.name}</div>
+          </div>
+          <div>
+            <div className="pdf-meta-label">Building</div>
+            <div className="pdf-meta-value">{assessment.unit.building.name}</div>
+          </div>
+          <div>
+            <div className="pdf-meta-label">Unit</div>
+            <div className="pdf-meta-value">{assessment.unit.number}</div>
+          </div>
+          <div>
+            <div className="pdf-meta-label">Assessment Date</div>
+            <div className="pdf-meta-value">
+              {new Date(assessment.assessedAt).toLocaleDateString()}
+            </div>
+          </div>
+          <div>
+            <div className="pdf-meta-label">Assessed By</div>
+            <div className="pdf-meta-value">{assessment.assessedBy || "—"}</div>
           </div>
         </div>
-      ))}
+      </div>
 
-      {/* Summary */}
-      <div className="summary-box">
-        <div className="pdf-section-title">Summary</div>
-        <div className="summary-row">
-          <span>Total Rooms:</span>
-          <span>{assessment.rooms.length}</span>
-        </div>
-        <div className="summary-row">
-          <span>Total Components:</span>
-          <span>
-            {assessment.rooms.reduce(
-              (sum, room) => sum + room.componentAssessments.length,
-              0
-            )}
-          </span>
-        </div>
+      {/* Rooms and Components - separate table for each room */}
+      <div className="pdf-section">
+        {assessment.rooms.map((room) => {
+          const components = room.componentAssessments || []
+          
+          return (
+            <div key={room.id} className="pdf-group-table-wrapper">
+              {/* Component count above room header */}
+              <div style={{ 
+                fontSize: '8pt', 
+                color: '#666', 
+                padding: '2px 0 4px 0',
+                textAlign: 'left'
+              }}>
+                {components.length} component{components.length !== 1 ? 's' : ''}
+              </div>
+              {/* Room Header */}
+              <div 
+                className="pdf-group-header"
+                style={{
+                  backgroundColor: "#111827",
+                  background: "#111827",
+                  color: "white",
+                  display: "block",
+                }}
+              >
+                {room.name.toUpperCase()}
+              </div>
+              {/* Separate table for this room */}
+              {components.length > 0 ? (
+                <table className="component-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "25%" }}>Component</th>
+                      <th style={{ width: "20%" }}>Condition</th>
+                      <th style={{ width: "55%" }}>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {components.map((component) => (
+                      <tr key={component.id}>
+                        <td>
+                          <div className="component-type-title">
+                            {component.componentName || component.componentType}
+                          </div>
+                          {component.componentType && component.componentName && (
+                            <div className="component-material-meta">
+                              {component.componentType}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {component.condition ? (
+                            <span
+                              className="status-pill"
+                              style={{
+                                backgroundColor: getStatusColor(component.condition, componentStatuses),
+                                color: "white",
+                                background: getStatusColor(component.condition, componentStatuses),
+                              } as React.CSSProperties}
+                            >
+                              {component.condition}
+                            </span>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="component-notes-text">
+                            {component.notes || <span className="text-muted">—</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{ 
+                  padding: "1rem", 
+                  textAlign: "center", 
+                  color: "#6b7280",
+                  fontSize: "8pt"
+                }}>
+                  No components assessed in this room.
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* Footer */}
-      <div
-        className="print-footer"
-        style={{
-          marginTop: "3rem",
-          paddingTop: "1rem",
-          borderTop: "1px solid #e5e7eb",
-          fontSize: "0.75rem",
-          color: "#6b7280",
-          textAlign: "center",
-        }}
-      >
+      <div className="print-footer">
         <div>{companyName}</div>
         <div>Generated on {generatedAt}</div>
       </div>

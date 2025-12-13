@@ -76,6 +76,11 @@ const TableHead = React.forwardRef<
       "h-8 px-3 text-left align-middle font-medium text-muted-foreground text-xs [&:has([role=checkbox])]:pr-0",
       className
     )}
+    style={{
+      ...props.style,
+      // Prevent column from shrinking below its min-width
+      boxSizing: 'border-box',
+    }}
     {...props}
   />
 ))
@@ -88,6 +93,11 @@ const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn("py-2 px-3 align-middle text-sm [&:has([role=checkbox])]:pr-0", className)}
+    style={{
+      ...props.style,
+      // Ensure cells respect min-width from headers
+      boxSizing: 'border-box',
+    }}
     {...props}
   />
 ))

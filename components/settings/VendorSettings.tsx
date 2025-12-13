@@ -93,9 +93,13 @@ export function VendorSettings() {
         throw new Error(data.error || "Failed to add vendor")
       }
 
+      const newVendor = await response.json()
+
+      // Update local state instead of refetching
+      setVendors([...vendors, newVendor])
+
       setVendorForm({ name: "", contact: "", address: "" })
       setAddDialogOpen(false)
-      fetchVendors()
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
@@ -144,9 +148,22 @@ export function VendorSettings() {
         throw new Error(data.error || "Failed to update vendor")
       }
 
+      const updatedVendor = await response.json()
+
+      // Update local state instead of refetching
+      setVendors(vendors.map(vendor =>
+        vendor.id === vendorId
+          ? {
+              ...vendor,
+              name: updatedVendor.name,
+              contact: updatedVendor.contact,
+              address: updatedVendor.address,
+            }
+          : vendor
+      ))
+
       setEditingVendorId(null)
       setVendorForm({ name: "", contact: "", address: "" })
-      fetchVendors()
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
@@ -172,9 +189,11 @@ export function VendorSettings() {
         throw new Error(data.error || "Failed to delete vendor")
       }
 
+      // Update local state instead of refetching
+      setVendors(vendors.filter(vendor => vendor.id !== selectedVendor.id))
+
       setDeleteDialogOpen(false)
       setSelectedVendor(null)
-      fetchVendors()
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
       setDeleteDialogOpen(false)
@@ -225,6 +244,7 @@ export function VendorSettings() {
 
       const result = await response.json()
       alert(`Successfully imported ${result.count || 0} vendor(s)`)
+      // Refetch vendors after import since we don't know which ones were added
       fetchVendors()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to import CSV")

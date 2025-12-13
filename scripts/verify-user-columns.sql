@@ -56,3 +56,5 @@ WHERE table_name = 'User'
 AND column_name IN ('phone', 'jobTitle', 'profilePictureUrl')
 ORDER BY column_name;
 
+
+

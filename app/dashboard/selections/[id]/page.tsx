@@ -31,7 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { ArrowLeftIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowPathIcon, DocumentDuplicateIcon, PencilIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline"
+import { ArrowLeftIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowPathIcon, DocumentDuplicateIcon, PencilIcon, CheckIcon, XMarkIcon, Bars3Icon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
 import { CatalogItemSelectModal } from "@/components/CatalogItemSelectModal"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -211,6 +211,13 @@ export default function SelectionDetailPage() {
   const [deleteRoomConfirmOpen, setDeleteRoomConfirmOpen] = useState<string | null>(null)
   const [deletingRoom, setDeletingRoom] = useState(false)
 
+  // Drag and drop state
+  const [draggedComponentId, setDraggedComponentId] = useState<string | null>(null)
+  const [draggedGroupKey, setDraggedGroupKey] = useState<string | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [dragOverGroupKey, setDragOverGroupKey] = useState<string | null>(null)
+  const [componentOrder, setComponentOrder] = useState<Map<string, string[]>>(new Map())
+
   useEffect(() => {
     if (selectionId) {
       fetchData()
@@ -375,11 +382,20 @@ export default function SelectionDetailPage() {
         throw new Error("Failed to add room")
       }
 
+      const newRoom = await response.json()
+
+      // Update local state instead of refetching
+      if (selection) {
+        setSelection({
+          ...selection,
+          designRooms: [...selection.designRooms, newRoom],
+        })
+      }
+
       setNewRoomName("")
       setShowRoomDropdown(false)
       setSelectedRoomIndex(-1)
       setAddRoomOpen(false)
-      fetchData()
     } catch (error) {
       console.error("Error adding room:", error)
       alert("Failed to add room")
@@ -415,6 +431,23 @@ export default function SelectionDetailPage() {
         throw new Error("Failed to add components")
       }
 
+      const addedComponents = await response.json()
+
+      // Update local state instead of refetching
+      if (selection) {
+        setSelection({
+          ...selection,
+          designRooms: selection.designRooms.map(room =>
+            room.id === roomId
+              ? {
+                  ...room,
+                  designComponents: [...room.designComponents, ...addedComponents],
+                }
+              : room
+          ),
+        })
+      }
+
       setNewComponent({
         selectedComponents: [],
         notes: "",
@@ -422,7 +455,6 @@ export default function SelectionDetailPage() {
       setExpandedCategories(new Set())
       setComponentSearchTerm("")
       setAddComponentOpen(null)
-      fetchData()
     } catch (error) {
       console.error("Error adding components:", error)
       alert("Failed to add components")
@@ -505,6 +537,9 @@ export default function SelectionDetailPage() {
   const handleSaveComponent = async () => {
     if (!editingComponentId || !editingComponent) return
 
+    // Preserve scroll position
+    const scrollPosition = window.scrollY
+
     setSavingComponent(true)
     try {
       const response = await fetch(`/api/design-components/${editingComponentId}`, {
@@ -527,9 +562,41 @@ export default function SelectionDetailPage() {
         throw new Error("Failed to update component")
       }
 
+      const updatedComponent = await response.json()
+
+      // Update local state instead of refetching
+      if (selection) {
+        setSelection({
+          ...selection,
+          designRooms: selection.designRooms.map(room => ({
+            ...room,
+            designComponents: room.designComponents.map(comp =>
+              comp.id === editingComponentId
+                ? {
+                    ...comp,
+                    componentType: updatedComponent.componentType || comp.componentType,
+                    condition: updatedComponent.condition ?? comp.condition,
+                    materialId: updatedComponent.materialId ?? comp.materialId,
+                    vendorId: updatedComponent.vendorId ?? comp.vendorId,
+                    notes: updatedComponent.notes ?? comp.notes,
+                    residentUpgrade: updatedComponent.residentUpgrade ?? comp.residentUpgrade,
+                    quantity: updatedComponent.quantity ?? comp.quantity,
+                    unitCost: updatedComponent.unitCost ?? comp.unitCost,
+                    totalCost: updatedComponent.totalCost ?? comp.totalCost,
+                  }
+                : comp
+            ),
+          })),
+        })
+      }
+
       setEditingComponentId(null)
       setEditingComponent(null)
-      fetchData()
+      
+      // Restore scroll position after state update
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition)
+      })
     } catch (error) {
       console.error("Error updating component:", error)
       alert("Failed to update component")
@@ -541,6 +608,9 @@ export default function SelectionDetailPage() {
   const handleDeleteComponent = async () => {
     if (!deleteConfirmOpen) return
 
+    // Preserve scroll position
+    const scrollPosition = window.scrollY
+
     setDeletingComponent(true)
     try {
       const response = await fetch(`/api/design-components/${deleteConfirmOpen}`, {
@@ -551,8 +621,23 @@ export default function SelectionDetailPage() {
         throw new Error("Failed to delete component")
       }
 
+      // Update local state instead of refetching
+      if (selection) {
+        setSelection({
+          ...selection,
+          designRooms: selection.designRooms.map(room => ({
+            ...room,
+            designComponents: room.designComponents.filter(comp => comp.id !== deleteConfirmOpen),
+          })),
+        })
+      }
+
       setDeleteConfirmOpen(null)
-      fetchData()
+      
+      // Restore scroll position after state update
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition)
+      })
     } catch (error) {
       console.error("Error deleting component:", error)
       alert("Failed to delete component")
@@ -577,6 +662,9 @@ export default function SelectionDetailPage() {
       return
     }
 
+    // Preserve scroll position
+    const scrollPosition = window.scrollY
+
     setSavingRoom(true)
     try {
       const response = await fetch(`/api/design-rooms/${roomId}`, {
@@ -589,9 +677,25 @@ export default function SelectionDetailPage() {
         throw new Error("Failed to update room")
       }
 
+      // Update local state instead of refetching
+      if (selection) {
+        setSelection({
+          ...selection,
+          designRooms: selection.designRooms.map(room =>
+            room.id === roomId
+              ? { ...room, name: editingRoomName.trim() }
+              : room
+          ),
+        })
+      }
+
       setEditingRoomId(null)
       setEditingRoomName("")
-      fetchData()
+      
+      // Restore scroll position after state update
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition)
+      })
     } catch (error) {
       console.error("Error updating room:", error)
       alert("Failed to update room")
@@ -601,6 +705,9 @@ export default function SelectionDetailPage() {
   }
 
   const handleDeleteRoom = async (roomId: string) => {
+    // Preserve scroll position
+    const scrollPosition = window.scrollY
+
     setDeletingRoom(true)
     try {
       const response = await fetch(`/api/design-rooms/${roomId}`, {
@@ -611,8 +718,20 @@ export default function SelectionDetailPage() {
         throw new Error("Failed to delete room")
       }
 
+      // Update local state instead of refetching
+      if (selection) {
+        setSelection({
+          ...selection,
+          designRooms: selection.designRooms.filter(room => room.id !== roomId),
+        })
+      }
+
       setDeleteRoomConfirmOpen(null)
-      fetchData()
+      
+      // Restore scroll position after state update
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition)
+      })
     } catch (error) {
       console.error("Error deleting room:", error)
       alert("Failed to delete room")
@@ -683,8 +802,25 @@ export default function SelectionDetailPage() {
     return null
   }
 
-  // Organize components by view mode
-  const getOrganizedComponents = () => {
+  // Handle component reordering within a group
+  const handleReorderComponents = (groupKey: string, fromIndex: number, toIndex: number) => {
+    const groups = getOrganizedComponentsWithoutCustomOrder()
+    const group = groups.find(g => g.groupKey === groupKey)
+    if (!group) return
+
+    const newComponents = [...group.components]
+    const [removed] = newComponents.splice(fromIndex, 1)
+    newComponents.splice(toIndex, 0, removed)
+
+    setComponentOrder(prev => {
+      const newMap = new Map(prev)
+      newMap.set(groupKey, newComponents.map(c => c.id))
+      return newMap
+    })
+  }
+
+  // Get organized components without custom order (original logic)
+  const getOrganizedComponentsWithoutCustomOrder = () => {
     const allComponents = getAllComponents()
 
     if (viewMode === "rooms") {
@@ -768,6 +904,42 @@ export default function SelectionDetailPage() {
         .filter((group) => group.components.length > 0)
     }
     return []
+  }
+
+  // Organize components by view mode (with custom ordering applied)
+  const getOrganizedComponents = () => {
+    const groups = getOrganizedComponentsWithoutCustomOrder()
+    
+    // Apply custom ordering if available
+    return groups.map(group => {
+      const customOrder = componentOrder.get(group.groupKey)
+      if (customOrder && customOrder.length > 0) {
+        // Create a map for quick lookup
+        const componentMap = new Map(group.components.map(c => [c.id, c]))
+        // Reorder components according to custom order, keeping any new components at the end
+        const orderedComponents: typeof group.components = []
+        const usedIds = new Set<string>()
+        
+        // Add components in custom order
+        customOrder.forEach(id => {
+          const comp = componentMap.get(id)
+          if (comp) {
+            orderedComponents.push(comp)
+            usedIds.add(id)
+          }
+        })
+        
+        // Add any components not in custom order at the end
+        group.components.forEach(comp => {
+          if (!usedIds.has(comp.id)) {
+            orderedComponents.push(comp)
+          }
+        })
+        
+        return { ...group, components: orderedComponents }
+      }
+      return group
+    })
   }
 
   const toggleComponentCheckbox = (componentId: string) => {
@@ -870,8 +1042,18 @@ export default function SelectionDetailPage() {
         throw new Error("Failed to update project association")
       }
 
+      const updatedSelection = await response.json()
+
+      // Update local state instead of refreshing
+      if (selection) {
+        setSelection({
+          ...selection,
+          projectId: updatedSelection.projectId,
+          project: updatedSelection.project,
+        })
+      }
+
       setCurrentProjectId(projectId || null)
-      router.refresh()
     } catch (error) {
       console.error("Error updating project:", error)
       alert("Failed to update project association")
@@ -1228,6 +1410,9 @@ export default function SelectionDetailPage() {
                     updates.unitCost = parseFloat(bulkActions.unitCost)
                   }
 
+                  // Preserve scroll position
+                  const scrollPosition = window.scrollY
+
                   const response = await fetch("/api/design-components/bulk", {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
@@ -1245,6 +1430,55 @@ export default function SelectionDetailPage() {
                   const result = await response.json()
                   const updatedCount = result.updated || selectedComponentIds.size
 
+                  // Update local state instead of refetching
+                  if (selection) {
+                    const componentIdsSet = new Set(selectedComponentIds)
+                    const processedUpdates: any = {}
+                    
+                    // Process updates to match API logic
+                    if (updates.vendorId !== undefined) {
+                      processedUpdates.vendorId = updates.vendorId === null || updates.vendorId === "__clear__" || updates.vendorId === "" ? null : updates.vendorId
+                    }
+                    if (updates.condition !== undefined) {
+                      processedUpdates.condition = updates.condition === null || updates.condition === "__clear__" || updates.condition === "" ? null : updates.condition?.trim() || null
+                    }
+                    if (updates.residentUpgrade !== undefined) {
+                      if (updates.residentUpgrade === true || updates.residentUpgrade === "upgrade") {
+                        processedUpdates.residentUpgrade = true
+                      } else if (updates.residentUpgrade === false || updates.residentUpgrade === "included") {
+                        processedUpdates.residentUpgrade = false
+                      } else if (updates.residentUpgrade === null || updates.residentUpgrade === "__clear__") {
+                        processedUpdates.residentUpgrade = null
+                      }
+                    }
+                    if (updates.quantity !== undefined && updates.quantity !== "") {
+                      processedUpdates.quantity = parseFloat(updates.quantity)
+                    }
+                    if (updates.unitCost !== undefined && updates.unitCost !== "") {
+                      processedUpdates.unitCost = parseFloat(updates.unitCost)
+                    }
+
+                    setSelection({
+                      ...selection,
+                      designRooms: selection.designRooms.map(room => ({
+                        ...room,
+                        designComponents: room.designComponents.map(comp => {
+                          if (componentIdsSet.has(comp.id)) {
+                            const updatedComp = { ...comp, ...processedUpdates }
+                            // Recalculate totalCost if quantity or unitCost changed
+                            if (processedUpdates.quantity !== undefined || processedUpdates.unitCost !== undefined) {
+                              const finalQuantity = processedUpdates.quantity !== undefined ? processedUpdates.quantity : comp.quantity
+                              const finalUnitCost = processedUpdates.unitCost !== undefined ? processedUpdates.unitCost : comp.unitCost
+                              updatedComp.totalCost = finalQuantity * finalUnitCost
+                            }
+                            return updatedComp
+                          }
+                          return comp
+                        }),
+                      })),
+                    })
+                  }
+
                   // Reset bulk actions and selection
                   setSelectedComponentIds(new Set())
                   setBulkActions({
@@ -1255,10 +1489,10 @@ export default function SelectionDetailPage() {
                     unitCost: "",
                   })
 
-                  // Refresh data
-                  fetchData()
-                  
-                  alert(`Successfully updated ${updatedCount} component(s)`)
+                  // Restore scroll position after state update
+                  requestAnimationFrame(() => {
+                    window.scrollTo(0, scrollPosition)
+                  })
                 } catch (error: any) {
                   console.error("Error applying bulk actions:", error)
                   alert(`Failed to apply bulk actions: ${error.message}`)
@@ -1442,7 +1676,8 @@ export default function SelectionDetailPage() {
                   <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40px]">
+                        <TableHead className="w-[32px] min-w-[32px] border-r"></TableHead>
+                        <TableHead className="w-[40px] min-w-[40px] border-r">
                           <input
                             type="checkbox"
                             checked={group.components.length > 0 && group.components.every((c) => selectedComponentIds.has(c.id))}
@@ -1466,37 +1701,138 @@ export default function SelectionDetailPage() {
                             onClick={(e) => e.stopPropagation()}
                           />
                         </TableHead>
-                        {viewMode !== "rooms" && <TableHead className="w-[120px]">Room</TableHead>}
-                        <TableHead className="w-[120px]">
+                        {viewMode !== "rooms" && <TableHead className="w-[120px] min-w-[120px] border-r">Room</TableHead>}
+                        <TableHead className="w-[120px] min-w-[120px] border-r">
                           <div className="flex flex-col">
                             <span>Component</span>
                             <span>/ Type</span>
                           </div>
                         </TableHead>
-                        <TableHead className="w-[280px]">Catalog Item</TableHead>
-                        <TableHead className="w-[100px] text-center">Upgrade</TableHead>
-                        <TableHead className="w-[120px]">Vendor</TableHead>
-                        <TableHead className="w-[100px]">
+                        <TableHead className="w-[280px] min-w-[200px] border-r">Catalog Item</TableHead>
+                        <TableHead className="w-[100px] min-w-[100px] text-center border-r">Upgrade</TableHead>
+                        <TableHead className="w-[120px] min-w-[120px] border-r">Vendor</TableHead>
+                        <TableHead className="w-[100px] min-w-[100px] border-r">
                           <div className="flex flex-col">
                             <span>Quantity</span>
                             <span>/ Price</span>
                           </div>
                         </TableHead>
-                        <TableHead className="w-[300px]">Notes</TableHead>
+                        <TableHead className="w-[300px] min-w-[200px]">Notes</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {group.components.map((component) => (
+                      {group.components.map((component, componentIndex) => {
+                        const isDragOver = dragOverIndex === componentIndex && dragOverGroupKey === group.groupKey && draggedGroupKey === group.groupKey
+                        const isDragged = draggedComponentId === component.id
+                        const draggedIndex = draggedComponentId ? group.components.findIndex(c => c.id === draggedComponentId) : -1
+                        // Show drop line above the hovered row to indicate insertion point
+                        // When dragging down to the last row, show below instead
+                        const isLastRow = componentIndex === group.components.length - 1
+                        const isDraggingDown = draggedIndex !== -1 && componentIndex > draggedIndex
+                        const showDropLineAbove = isDragOver && !(isLastRow && isDraggingDown)
+                        const showDropLineBelow = isDragOver && isLastRow && isDraggingDown
+                        
+                        return (
+                        <React.Fragment key={component.id}>
+                          {showDropLineAbove && (
+                            <tr>
+                              <td colSpan={100} className="h-0 p-0">
+                                <div className="h-0.5 bg-blue-500 mx-0"></div>
+                              </td>
+                            </tr>
+                          )}
                         <TableRow
-                          key={component.id}
                           className={cn(
-                            "cursor-pointer",
+                            "cursor-pointer relative",
                             editingComponentId === component.id && "bg-gray-50",
-                            component.residentUpgrade === true && "bg-green-50"
+                            component.residentUpgrade === true && "bg-green-50",
+                            isDragged && "opacity-50"
                           )}
                           onClick={() => handleEditComponent(component)}
+                          draggable
+                          onDragStart={(e) => {
+                            const row = e.currentTarget as HTMLElement
+                            // Store the row's dimensions before drag starts
+                            const rowWidth = row.offsetWidth
+                            const rowHeight = row.offsetHeight
+                            
+                            setDraggedComponentId(component.id)
+                            setDraggedGroupKey(group.groupKey)
+                            setDragOverIndex(null)
+                            setDragOverGroupKey(null)
+                            e.dataTransfer.effectAllowed = "move"
+                            e.dataTransfer.setData("text/plain", "")
+                            
+                            // Maintain row dimensions during drag to prevent layout shift
+                            row.style.width = `${rowWidth}px`
+                            row.style.minWidth = `${rowWidth}px`
+                            row.style.height = `${rowHeight}px`
+                            row.style.minHeight = `${rowHeight}px`
+                            
+                            // Create a custom drag image to prevent layout shifts
+                            const dragImage = row.cloneNode(true) as HTMLElement
+                            dragImage.style.width = `${rowWidth}px`
+                            dragImage.style.opacity = '0.5'
+                            dragImage.style.position = 'absolute'
+                            dragImage.style.top = '-9999px'
+                            document.body.appendChild(dragImage)
+                            e.dataTransfer.setDragImage(dragImage, 0, 0)
+                            setTimeout(() => {
+                              document.body.removeChild(dragImage)
+                              // Reset row styles after drag image is created
+                              row.style.width = ''
+                              row.style.minWidth = ''
+                              row.style.height = ''
+                              row.style.minHeight = ''
+                            }, 0)
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = "move"
+                            if (draggedGroupKey === group.groupKey && draggedComponentId !== component.id) {
+                              setDragOverIndex(componentIndex)
+                              setDragOverGroupKey(group.groupKey)
+                            }
+                          }}
+                          onDragLeave={(e) => {
+                            // Only clear if we're actually leaving the row (not just moving to a child element)
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                            const x = e.clientX
+                            const y = e.clientY
+                            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                              setDragOverIndex(null)
+                              setDragOverGroupKey(null)
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            if (draggedComponentId && draggedGroupKey === group.groupKey && draggedComponentId !== component.id) {
+                              const targetIndex = componentIndex
+                              if (draggedIndex !== -1 && draggedIndex !== targetIndex) {
+                                handleReorderComponents(group.groupKey, draggedIndex, targetIndex)
+                              }
+                            }
+                            setDraggedComponentId(null)
+                            setDraggedGroupKey(null)
+                            setDragOverIndex(null)
+                            setDragOverGroupKey(null)
+                          }}
+                          onDragEnd={() => {
+                            setDraggedComponentId(null)
+                            setDraggedGroupKey(null)
+                            setDragOverIndex(null)
+                            setDragOverGroupKey(null)
+                          }}
                         >
-                          <TableCell onClick={(e) => e.stopPropagation()}>
+                          <TableCell className="border-r cursor-move w-[32px] min-w-[32px] max-w-[32px] p-0" onClick={(e) => e.stopPropagation()}>
+                            <div
+                              className="flex items-center justify-center text-gray-400 hover:text-gray-600 w-full h-full"
+                              style={{ minWidth: '32px', width: '32px' }}
+                            >
+                              <Bars3Icon className="h-5 w-5 flex-shrink-0" />
+                            </div>
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()} className="border-r">
                             <input
                               type="checkbox"
                               checked={selectedComponentIds.has(component.id)}
@@ -1504,10 +1840,10 @@ export default function SelectionDetailPage() {
                             />
                           </TableCell>
                           {viewMode !== "rooms" && (
-                            <TableCell className="text-xs">{component.roomName || "—"}</TableCell>
+                            <TableCell className="text-xs border-r">{component.roomName || "—"}</TableCell>
                           )}
                           {/* Component Type / Condition Column */}
-                          <TableCell>
+                          <TableCell className="border-r">
                             <div className="space-y-1">
                               <div className="text-xs font-medium">{component.componentType}</div>
                               {component.condition && (
@@ -1582,7 +1918,7 @@ export default function SelectionDetailPage() {
                           </TableCell>
                           
                           {/* Catalog Item Column */}
-                          <TableCell>
+                          <TableCell className="border-r">
                             {editingComponentId === component.id ? (
                               <div className="space-y-2">
                                 <Label className="text-xs">Catalog Item</Label>
@@ -1758,7 +2094,7 @@ export default function SelectionDetailPage() {
                           </TableCell>
                           
                           {/* Resident Upgrade Column */}
-                          <TableCell className="text-center">
+                          <TableCell className="text-center border-r">
                             {editingComponentId === component.id ? (
                               <RadioGroup
                                 value={editingComponent?.residentUpgrade || undefined}
@@ -1796,7 +2132,7 @@ export default function SelectionDetailPage() {
                           </TableCell>
                           
                           {/* Vendor Column */}
-                          <TableCell>
+                          <TableCell className="border-r">
                             {editingComponentId === component.id ? (
                               <div className="space-y-2">
                                 <Label className="text-xs">Vendor</Label>
@@ -1833,7 +2169,7 @@ export default function SelectionDetailPage() {
                           </TableCell>
                           
                           {/* Quantity / Price Column */}
-                          <TableCell>
+                          <TableCell className="border-r">
                             {editingComponentId === component.id ? (
                               <div className="space-y-2">
                                 <div>
@@ -1946,7 +2282,16 @@ export default function SelectionDetailPage() {
                             )}
                           </TableCell>
                         </TableRow>
-                      ))}
+                        {showDropLineBelow && (
+                          <tr>
+                            <td colSpan={100} className="h-0 p-0">
+                              <div className="h-0.5 bg-blue-500 mx-0"></div>
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -1969,7 +2314,8 @@ export default function SelectionDetailPage() {
                   <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40px]">
+                        <TableHead className="w-[32px] min-w-[32px] border-r"></TableHead>
+                        <TableHead className="w-[40px] min-w-[40px] border-r">
                           <input
                             type="checkbox"
                             checked={group.components.length > 0 && group.components.every((c) => selectedComponentIds.has(c.id))}
@@ -1993,46 +2339,164 @@ export default function SelectionDetailPage() {
                             onClick={(e) => e.stopPropagation()}
                           />
                         </TableHead>
-                        <TableHead className="w-[120px]">Room</TableHead>
-                        <TableHead className="w-[120px]">
+                        <TableHead className="w-[120px] min-w-[120px] border-r">Room</TableHead>
+                        <TableHead className="w-[120px] min-w-[120px] border-r">
                           <div className="flex flex-col">
                             <span>Component</span>
                             <span>/ Type</span>
                           </div>
                         </TableHead>
-                        <TableHead className="w-[280px]">Catalog Item</TableHead>
-                        <TableHead className="w-[100px] text-center">Upgrade</TableHead>
-                        <TableHead className="w-[120px]">Vendor</TableHead>
-                        <TableHead className="w-[100px]">
+                            <TableHead className="w-[280px] min-w-[200px] border-r">Catalog Item</TableHead>
+                        <TableHead className="w-[100px] min-w-[100px] text-center border-r">Upgrade</TableHead>
+                        <TableHead className="w-[120px] min-w-[120px] border-r">Vendor</TableHead>
+                        <TableHead className="w-[100px] min-w-[100px] border-r">
                           <div className="flex flex-col">
                             <span>Quantity</span>
                             <span>/ Price</span>
                           </div>
                         </TableHead>
-                        <TableHead className="w-[300px]">Notes</TableHead>
+                        <TableHead className="w-[300px] min-w-[200px]">Notes</TableHead>
                       </TableRow>
                     </TableHeader>
                         <TableBody>
-                          {group.components.map((component) => (
+                          {group.components.map((component, componentIndex) => {
+                            const isDragOver = dragOverIndex === componentIndex && dragOverGroupKey === group.groupKey && draggedGroupKey === group.groupKey
+                            const isDragged = draggedComponentId === component.id
+                            const draggedIndex = draggedComponentId ? group.components.findIndex(c => c.id === draggedComponentId) : -1
+                            // Show drop line above the hovered row to indicate insertion point
+                            // When dragging down to the last row, show below instead
+                            const isLastRow = componentIndex === group.components.length - 1
+                            const isDraggingDown = draggedIndex !== -1 && componentIndex > draggedIndex
+                            const showDropLineAbove = isDragOver && !(isLastRow && isDraggingDown)
+                            const showDropLineBelow = isDragOver && isLastRow && isDraggingDown
+                            
+                            return (
+                            <React.Fragment key={component.id}>
+                              {showDropLineAbove && (
+                                <tr>
+                                  <td colSpan={100} className="h-0 p-0">
+                                    <div className="h-0.5 bg-blue-500 mx-0"></div>
+                                  </td>
+                                </tr>
+                              )}
                             <TableRow
-                              key={component.id}
                               className={cn(
-                                "cursor-pointer",
+                                "cursor-pointer relative",
                                 editingComponentId === component.id && "bg-gray-50",
-                                component.residentUpgrade === true && "bg-green-50"
+                                component.residentUpgrade === true && "bg-green-50",
+                                isDragged && "opacity-50"
                               )}
                               onClick={() => handleEditComponent(component)}
+                              draggable
+                              onDragStart={(e) => {
+                                setDraggedComponentId(component.id)
+                                setDraggedGroupKey(group.groupKey)
+                                setDragOverIndex(null)
+                                setDragOverGroupKey(null)
+                                e.dataTransfer.effectAllowed = "move"
+                                e.dataTransfer.setData("text/plain", "")
+                                // Create a custom drag image to prevent layout shifts
+                                const dragImage = e.currentTarget.cloneNode(true) as HTMLElement
+                                dragImage.style.width = `${e.currentTarget.offsetWidth}px`
+                                dragImage.style.opacity = '0.5'
+                                document.body.appendChild(dragImage)
+                                e.dataTransfer.setDragImage(dragImage, 0, 0)
+                                setTimeout(() => document.body.removeChild(dragImage), 0)
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault()
+                                e.dataTransfer.dropEffect = "move"
+                                if (draggedGroupKey === group.groupKey && draggedComponentId !== component.id) {
+                                  setDragOverIndex(componentIndex)
+                                  setDragOverGroupKey(group.groupKey)
+                                }
+                              }}
+                              onDragLeave={(e) => {
+                                // Only clear if we're actually leaving the row (not just moving to a child element)
+                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                                const x = e.clientX
+                                const y = e.clientY
+                                if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                                  setDragOverIndex(null)
+                                  setDragOverGroupKey(null)
+                                }
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault()
+                                if (draggedComponentId && draggedGroupKey === group.groupKey && draggedComponentId !== component.id) {
+                                  const targetIndex = componentIndex
+                                  if (draggedIndex !== -1 && draggedIndex !== targetIndex) {
+                                    handleReorderComponents(group.groupKey, draggedIndex, targetIndex)
+                                  }
+                                }
+                                setDraggedComponentId(null)
+                                setDraggedGroupKey(null)
+                                setDragOverIndex(null)
+                                setDragOverGroupKey(null)
+                              }}
+                              onDragEnd={() => {
+                                setDraggedComponentId(null)
+                                setDraggedGroupKey(null)
+                                setDragOverIndex(null)
+                                setDragOverGroupKey(null)
+                              }}
                             >
-                              <TableCell onClick={(e) => e.stopPropagation()}>
+                              <TableCell className="border-r cursor-move w-[32px] min-w-[32px] max-w-[32px] p-0" onClick={(e) => e.stopPropagation()}>
+                                <div
+                                  draggable
+                                  onDragStart={(e) => {
+                                    const row = e.currentTarget.closest('tr') as HTMLElement
+                                    if (row) {
+                                      // Store the row's dimensions before drag starts
+                                      const rowWidth = row.offsetWidth
+                                      const rowHeight = row.offsetHeight
+                                      
+                                      // Maintain row dimensions during drag to prevent layout shift
+                                      row.style.width = `${rowWidth}px`
+                                      row.style.minWidth = `${rowWidth}px`
+                                      row.style.height = `${rowHeight}px`
+                                      row.style.minHeight = `${rowHeight}px`
+                                      
+                                      // Create a custom drag image
+                                      const dragImage = row.cloneNode(true) as HTMLElement
+                                      dragImage.style.width = `${rowWidth}px`
+                                      dragImage.style.opacity = '0.5'
+                                      dragImage.style.position = 'absolute'
+                                      dragImage.style.top = '-9999px'
+                                      document.body.appendChild(dragImage)
+                                      e.dataTransfer.setDragImage(dragImage, 0, 0)
+                                      setTimeout(() => {
+                                        document.body.removeChild(dragImage)
+                                        // Reset row styles after drag image is created
+                                        row.style.width = ''
+                                        row.style.minWidth = ''
+                                        row.style.height = ''
+                                        row.style.minHeight = ''
+                                      }, 0)
+                                    }
+                                    
+                                    setDraggedComponentId(component.id)
+                                    setDraggedGroupKey(group.groupKey)
+                                    e.dataTransfer.effectAllowed = "move"
+                                    e.dataTransfer.setData("text/plain", "")
+                                    e.stopPropagation()
+                                  }}
+                                  className="flex items-center justify-center text-gray-400 hover:text-gray-600 w-full h-full"
+                                  style={{ minWidth: '32px', width: '32px' }}
+                                >
+                                  <Bars3Icon className="h-5 w-5 flex-shrink-0" />
+                                </div>
+                              </TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()} className="border-r">
                                 <input
                                   type="checkbox"
                                   checked={selectedComponentIds.has(component.id)}
                                   onChange={() => toggleComponentCheckbox(component.id)}
                                 />
                               </TableCell>
-                              <TableCell className="text-xs">{component.roomName || "—"}</TableCell>
+                              <TableCell className="text-xs border-r">{component.roomName || "—"}</TableCell>
                               {/* Component Type / Condition Column */}
-                              <TableCell>
+                              <TableCell className="border-r">
                                 <div className="space-y-1">
                                   <div className="text-xs font-medium">{component.componentType}</div>
                                   {component.condition && (
@@ -2107,7 +2571,7 @@ export default function SelectionDetailPage() {
                               </TableCell>
                               
                               {/* Catalog Item Column - same as rooms view */}
-                              <TableCell>
+                              <TableCell className="border-r">
                                 {editingComponentId === component.id ? (
                                   <div className="space-y-2">
                                     <Label className="text-xs">Catalog Item</Label>
@@ -2244,7 +2708,7 @@ export default function SelectionDetailPage() {
                               </TableCell>
                               
                               {/* Resident Upgrade Column */}
-                              <TableCell className="text-center">
+                              <TableCell className="text-center border-r">
                                 {editingComponentId === component.id ? (
                                   <RadioGroup
                                     value={editingComponent?.residentUpgrade || undefined}
@@ -2282,7 +2746,7 @@ export default function SelectionDetailPage() {
                               </TableCell>
                               
                               {/* Vendor Column */}
-                              <TableCell>
+                              <TableCell className="border-r">
                                 {editingComponentId === component.id ? (
                                   <div className="space-y-2">
                                     <Label className="text-xs">Vendor</Label>
@@ -2319,7 +2783,7 @@ export default function SelectionDetailPage() {
                               </TableCell>
                               
                               {/* Quantity / Price Column */}
-                              <TableCell>
+                              <TableCell className="border-r">
                                 {editingComponentId === component.id ? (
                                   <div className="space-y-2">
                                     <div>
@@ -2426,13 +2890,22 @@ export default function SelectionDetailPage() {
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="text-xs">
-                                    {component.notes || "—"}
-                                  </div>
-                                )}
+                              <div className="text-xs">
+                                {component.notes || "—"}
+                              </div>
+                            )}
                               </TableCell>
                             </TableRow>
-                          ))}
+                            {showDropLineBelow && (
+                              <tr>
+                                <td colSpan={100} className="h-0 p-0">
+                                  <div className="h-0.5 bg-blue-500 mx-0"></div>
+                                </td>
+                              </tr>
+                            )}
+                            </React.Fragment>
+                            )
+                          })}
                         </TableBody>
                       </Table>
                     </div>

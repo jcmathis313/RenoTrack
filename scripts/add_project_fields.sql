@@ -62,3 +62,5 @@ END $$;
 -- Verify the changes
 SELECT 'Project fields and tables added successfully' as status;
 
+
+
