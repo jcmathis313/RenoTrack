@@ -158,6 +158,12 @@ export default function TemplateDetailPage() {
   const [addingComponent, setAddingComponent] = useState(false)
   const [catalogModalOpen, setCatalogModalOpen] = useState(false)
   const [currentRoomForCatalog, setCurrentRoomForCatalog] = useState<string | null>(null)
+  
+  // Clone room state
+  const [cloneRoomDialogOpen, setCloneRoomDialogOpen] = useState(false)
+  const [roomToClone, setRoomToClone] = useState<TemplateRoom | null>(null)
+  const [cloneRoomName, setCloneRoomName] = useState("")
+  const [cloningRoom, setCloningRoom] = useState(false)
 
   useEffect(() => {
     if (templateId) {
@@ -398,6 +404,43 @@ export default function TemplateDetailPage() {
     }
   }
 
+  const handleCloneRoom = (room: TemplateRoom) => {
+    setRoomToClone(room)
+    setCloneRoomName(`${room.name} (Copy)`)
+    setCloneRoomDialogOpen(true)
+  }
+
+  const handleCloneRoomSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!roomToClone || !cloneRoomName.trim() || !templateId) return
+
+    setCloningRoom(true)
+    try {
+      const response = await fetch(`/api/settings/templates/${templateId}/rooms/${roomToClone.id}/clone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: cloneRoomName.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to clone room")
+      }
+
+      setCloneRoomDialogOpen(false)
+      setRoomToClone(null)
+      setCloneRoomName("")
+      fetchData()
+    } catch (error) {
+      console.error("Error cloning room:", error)
+      alert(error instanceof Error ? error.message : "Failed to clone room")
+    } finally {
+      setCloningRoom(false)
+    }
+  }
+
   const handleEditRoom = (room: TemplateRoom) => {
     setEditingRoomId(room.id)
     setEditingRoomName(room.name)
@@ -615,6 +658,14 @@ export default function TemplateDetailPage() {
                         <Button
                           size="sm"
                           variant="ghost"
+                          onClick={() => handleCloneRoom(room)}
+                          title="Clone Room"
+                        >
+                          <DocumentDuplicateIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           onClick={() => handleEditRoom(room)}
                         >
                           <PencilIcon className="h-4 w-4" />
@@ -634,11 +685,11 @@ export default function TemplateDetailPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Component / Type</TableHead>
+                          <TableHead>Component</TableHead>
                           <TableHead>Condition</TableHead>
                           <TableHead>Catalog Item</TableHead>
                           <TableHead>Vendor</TableHead>
-                          <TableHead>QTY / Price</TableHead>
+                          <TableHead>Amounts</TableHead>
                           <TableHead>Notes</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -964,6 +1015,50 @@ export default function TemplateDetailPage() {
               </Button>
               <Button type="submit" disabled={addingRoom || !newRoomName.trim()}>
                 {addingRoom ? "Adding..." : "Add Room"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clone Room Dialog */}
+      <Dialog open={cloneRoomDialogOpen} onOpenChange={setCloneRoomDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clone Room</DialogTitle>
+            <DialogDescription>
+              Create a copy of &quot;{roomToClone?.name}&quot;. Enter a name for the new room.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCloneRoomSubmit}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="clone-room-name">Room Name *</Label>
+                <Input
+                  id="clone-room-name"
+                  value={cloneRoomName}
+                  onChange={(e) => setCloneRoomName(e.target.value)}
+                  placeholder="Room name"
+                  required
+                  autoFocus
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setCloneRoomDialogOpen(false)
+                  setRoomToClone(null)
+                  setCloneRoomName("")
+                }}
+                disabled={cloningRoom}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={cloningRoom || !cloneRoomName.trim()}>
+                {cloningRoom ? "Cloning..." : "Clone Room"}
               </Button>
             </DialogFooter>
           </form>

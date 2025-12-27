@@ -62,6 +62,13 @@ export function TemplateSettings() {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  
+  // Clone state
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false)
+  const [templateToClone, setTemplateToClone] = useState<Template | null>(null)
+  const [cloneForm, setCloneForm] = useState({
+    name: "",
+  })
 
   useEffect(() => {
     fetchTemplates()
@@ -199,6 +206,48 @@ export function TemplateSettings() {
     }
   }
 
+  const handleCloneTemplate = (template: Template) => {
+    setTemplateToClone(template)
+    setCloneForm({ name: `${template.name} (Copy)` })
+    setCloneDialogOpen(true)
+    setError("")
+  }
+
+  const handleCloneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!templateToClone || !cloneForm.name.trim()) {
+      setError("Template name is required")
+      return
+    }
+
+    setSaving(true)
+    setError("")
+
+    try {
+      const response = await fetch(`/api/settings/templates/${templateToClone.id}/clone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: cloneForm.name.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to clone template")
+      }
+
+      setCloneDialogOpen(false)
+      setTemplateToClone(null)
+      setCloneForm({ name: "" })
+      fetchTemplates()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <Card>
@@ -309,6 +358,14 @@ export function TemplateSettings() {
                               <Button
                                 size="sm"
                                 variant="ghost"
+                                onClick={() => handleCloneTemplate(template)}
+                                title="Clone"
+                              >
+                                <DocumentDuplicateIcon className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
                                 onClick={() => handleEditTemplateStart(template)}
                               >
                                 <PencilIcon className="h-4 w-4" title="Rename" />
@@ -375,6 +432,55 @@ export function TemplateSettings() {
               </Button>
               <Button type="submit" disabled={saving}>
                 {saving ? "Creating..." : "Create Template"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clone Template Dialog */}
+      <Dialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clone Template</DialogTitle>
+            <DialogDescription>
+              Create a copy of &quot;{templateToClone?.name}&quot;. Enter a name for the new template.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCloneSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="clone-name">Template Name *</Label>
+              <Input
+                id="clone-name"
+                value={cloneForm.name}
+                onChange={(e) =>
+                  setCloneForm({ ...cloneForm, name: e.target.value })
+                }
+                placeholder="Template Name"
+                required
+                autoFocus
+              />
+            </div>
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">
+                {error}
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setCloneDialogOpen(false)
+                  setTemplateToClone(null)
+                  setCloneForm({ name: "" })
+                  setError("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Cloning..." : "Clone Template"}
               </Button>
             </DialogFooter>
           </form>
