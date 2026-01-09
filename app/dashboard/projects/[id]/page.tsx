@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/dialog"
 import Link from "next/link"
 import {
-  ArrowLeftIcon,
   PencilIcon,
   CheckCircleIcon,
   XCircleIcon,
@@ -90,6 +89,7 @@ interface Project {
   id: string
   name: string
   notes: string | null
+  status: string | null
   vacancyDate: string | null
   moveInDate: string | null
   createdAt: string
@@ -131,6 +131,7 @@ export default function ProjectDetailPage() {
   const [editData, setEditData] = useState({
     name: "",
     notes: "",
+    status: "Pending",
     vacancyDate: "",
     moveInDate: "",
   })
@@ -176,6 +177,7 @@ export default function ProjectDetailPage() {
         setEditData({
           name: data.name,
           notes: data.notes || "",
+          status: data.status || "Pending",
           vacancyDate: data.vacancyDate ? new Date(data.vacancyDate).toISOString().split("T")[0] : "",
           moveInDate: data.moveInDate ? new Date(data.moveInDate).toISOString().split("T")[0] : "",
         })
@@ -210,7 +212,10 @@ export default function ProjectDetailPage() {
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.error || "Failed to update project")
+        const errorMessage = data.details 
+          ? `${data.error || "Failed to update project"}: ${data.details}`
+          : data.error || "Failed to update project"
+        throw new Error(errorMessage)
       }
 
       const updated = await response.json()
@@ -218,6 +223,7 @@ export default function ProjectDetailPage() {
       setEditData({
         name: updated.name,
         notes: updated.notes || "",
+        status: updated.status || "Pending",
         vacancyDate: updated.vacancyDate ? new Date(updated.vacancyDate).toISOString().split("T")[0] : "",
         moveInDate: updated.moveInDate ? new Date(updated.moveInDate).toISOString().split("T")[0] : "",
       })
@@ -491,18 +497,12 @@ export default function ProjectDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.back()}>
-            <ArrowLeftIcon className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Unit {project.unit.number} • {project.unit.building.name} •{" "}
-              {project.unit.building.community.name}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Unit {project.unit.number} • {project.unit.building.name} •{" "}
+            {project.unit.building.community.name}
+          </p>
         </div>
       </div>
 
@@ -670,6 +670,24 @@ export default function ProjectDetailPage() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={editData.status}
+                    onValueChange={(value) =>
+                      setEditData({ ...editData, status: value })
+                    }
+                  >
+                    <SelectTrigger id="status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="In Progress">In Progress</SelectItem>
+                      <SelectItem value="Complete">Complete</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="notes">Notes</Label>
                   <Textarea
                     id="notes"
@@ -697,6 +715,7 @@ export default function ProjectDetailPage() {
                         ...prev,
                         name: project.name,
                         notes: project.notes || "",
+                        status: project.status || "Pending",
                         vacancyDate: project.vacancyDate ? new Date(project.vacancyDate).toISOString().split("T")[0] : "",
                         moveInDate: project.moveInDate ? new Date(project.moveInDate).toISOString().split("T")[0] : "",
                       }))
@@ -713,6 +732,31 @@ export default function ProjectDetailPage() {
                 <div>
                   <Label className="text-gray-500">Name</Label>
                   <p className="mt-1">{project.name}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Status</Label>
+                  <div className="mt-1">
+                    {project.status === "Pending" && (
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                        Pending
+                      </span>
+                    )}
+                    {project.status === "In Progress" && (
+                      <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                        In Progress
+                      </span>
+                    )}
+                    {project.status === "Complete" && (
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                        Complete
+                      </span>
+                    )}
+                    {!project.status && (
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                        Pending
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {project.notes && (
                   <div>

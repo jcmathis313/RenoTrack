@@ -28,7 +28,7 @@ export function AdminSidebar() {
   }
 
   return (
-    <div className="flex h-full w-64 flex-col bg-white border-r border-gray-200">
+    <div className="flex h-full w-[236px] flex-col bg-white border-r border-gray-200">
       <div className="flex h-16 items-center px-6 border-b border-gray-200">
         <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
       </div>

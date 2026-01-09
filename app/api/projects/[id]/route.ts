@@ -211,6 +211,25 @@ export async function GET(
       project.projectNotes = []
     }
 
+    // Ensure status exists - fetch it explicitly if missing
+    const projectAny = project as any
+    if (!projectAny.status) {
+      try {
+        const [statusResult] = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT "status" FROM "Project" WHERE id = $1`,
+          projectId
+        )
+        if (statusResult) {
+          projectAny.status = statusResult.status || "Pending"
+        } else {
+          projectAny.status = "Pending"
+        }
+      } catch (e) {
+        // Column doesn't exist or query failed, use default
+        projectAny.status = "Pending"
+      }
+    }
+
     return NextResponse.json(project)
   } catch (error: any) {
     console.error("Error fetching project:", error)
@@ -265,7 +284,7 @@ export async function PUT(
 
     const projectId = params.id
     const body = await request.json()
-    const { name, notes, vacancyDate, moveInDate } = body
+    const { name, notes, status, vacancyDate, moveInDate } = body
 
     // Verify project exists and belongs to user's tenant
     const existingProject = await prisma.project.findFirst({
@@ -330,15 +349,76 @@ export async function PUT(
       hasDateColumns = false
     }
 
+    // Ensure status column exists
+    try {
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'Pending'`
+      )
+    } catch (e: any) {
+      // Column might already exist, that's fine
+      console.log("Status column check:", e?.message || "Column exists or created")
+    }
+
+    // Prepare update data
+    const updateData: any = {
+      name: name?.trim() || existingProject.name,
+      notes: notes !== undefined ? (notes?.trim() || null) : existingProject.notes,
+    }
+
+    // Try to include status in Prisma update
+    if (status !== undefined) {
+      updateData.status = status
+    }
+
     // Update basic fields using Prisma
-    project = await prisma.project.update({
-      where: { id: projectId },
-      data: {
-        name: name?.trim() || existingProject.name,
-        notes: notes !== undefined ? (notes?.trim() || null) : existingProject.notes,
-      },
-      include: baseInclude,
-    })
+    try {
+      project = await prisma.project.update({
+        where: { id: projectId },
+        data: updateData,
+        include: baseInclude,
+      })
+      console.log("Project updated via Prisma, status:", project.status)
+    } catch (updateError: any) {
+      // If Prisma update fails (e.g., column doesn't exist in DB yet),
+      // update without status first, then update status with raw SQL
+      console.error("Prisma update error:", updateError?.message)
+      
+      // Update without status
+      project = await prisma.project.update({
+        where: { id: projectId },
+        data: {
+          name: updateData.name,
+          notes: updateData.notes,
+        },
+        include: baseInclude,
+      })
+      
+      // Update status with raw SQL if needed
+      if (status !== undefined) {
+        try {
+          const result = await prisma.$executeRawUnsafe(
+            `UPDATE "Project" SET "status" = $1 WHERE id = $2`,
+            status,
+            projectId
+          )
+          console.log("Status updated via raw SQL:", status, "Result:", result)
+          // Fetch the updated status to confirm
+          const [statusCheck] = await prisma.$queryRawUnsafe<any[]>(
+            `SELECT "status" FROM "Project" WHERE id = $1`,
+            projectId
+          )
+          if (statusCheck) {
+            project.status = statusCheck.status
+            console.log("Confirmed status in DB:", statusCheck.status)
+          } else {
+            project.status = status
+          }
+        } catch (statusUpdateError: any) {
+          console.error("Error updating status with raw SQL:", statusUpdateError)
+          // Continue without status if update fails
+        }
+      }
+    }
 
     // Update dates using raw SQL if columns exist
     if (hasDateColumns && (vacancyDate !== undefined || moveInDate !== undefined)) {
@@ -373,19 +453,53 @@ export async function PUT(
       }
     }
     
+    // Ensure status is set correctly
+    const projectAny = project as any
+    const existingProjectAny = existingProject as any
+    
+    if (!projectAny.status && status !== undefined) {
+      // Try to fetch status from DB
+      try {
+        const [statusResult] = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT "status" FROM "Project" WHERE id = $1`,
+          projectId
+        )
+        if (statusResult && statusResult.status) {
+          projectAny.status = statusResult.status
+        } else {
+          projectAny.status = status
+        }
+      } catch (e) {
+        projectAny.status = status || "Pending"
+      }
+    } else if (!projectAny.status) {
+      projectAny.status = existingProjectAny.status || "Pending"
+    }
+
     // Add placeholder fields for relations
-    Object.assign(project, {
-      residents: [],
-      projectNotes: [],
-      vacancyDate: project.vacancyDate || null,
-      moveInDate: project.moveInDate || null,
+    Object.assign(projectAny, {
+      residents: projectAny.residents || [],
+      projectNotes: projectAny.projectNotes || [],
+      vacancyDate: projectAny.vacancyDate || null,
+      moveInDate: projectAny.moveInDate || null,
+      status: projectAny.status || "Pending",
     })
 
+    console.log("Returning project with status:", project.status)
     return NextResponse.json(project)
   } catch (error: any) {
     console.error("Error updating project:", error)
+    console.error("Error details:", {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    })
     return NextResponse.json(
-      { error: "Failed to update project" },
+      { 
+        error: "Failed to update project",
+        details: error?.message || String(error),
+        code: error?.code,
+      },
       { status: 500 }
     )
   }

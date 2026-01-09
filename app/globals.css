@@ -403,32 +403,62 @@ table.table-fixed th {
   width: 100%;
 }
 
+/* Selection table column widths (default: Component, Work Description, Image, Upgrade, QTY, Notes, Vendor) */
 .spec-table th:nth-child(1) {
-  width: 10%;
+  width: 8%; /* Component */
 }
 
 .spec-table th:nth-child(2) {
-  width: 35%;
+  width: 40%; /* Work Description - prioritized */
 }
 
 .spec-table th:nth-child(3) {
-  width: 6%;
+  width: 5%; /* Image */
 }
 
 .spec-table th:nth-child(4) {
-  width: 6%;
+  width: 5%; /* Upgrade */
 }
 
 .spec-table th:nth-child(5) {
-  width: 5%;
+  width: 4%; /* QTY */
 }
 
 .spec-table th:nth-child(6) {
-  width: 28%;
+  width: 30%; /* Notes - prioritized */
 }
 
 .spec-table th:nth-child(7) {
-  width: 10%;
+  width: 8%; /* Vendor */
+}
+
+/* Selection table with Room column (vendor variant: Room, Component, Work Description, Image, Upgrade, QTY, Notes) */
+.spec-table.vendor-variant th:nth-child(1) {
+  width: 8%; /* Room */
+}
+
+.spec-table.vendor-variant th:nth-child(2) {
+  width: 8%; /* Component */
+}
+
+.spec-table.vendor-variant th:nth-child(3) {
+  width: 40%; /* Work Description */
+}
+
+.spec-table.vendor-variant th:nth-child(4) {
+  width: 5%; /* Image */
+}
+
+.spec-table.vendor-variant th:nth-child(5) {
+  width: 5%; /* Upgrade */
+}
+
+.spec-table.vendor-variant th:nth-child(6) {
+  width: 4%; /* QTY */
+}
+
+.spec-table.vendor-variant th:nth-child(7) {
+  width: 30%; /* Notes */
 }
 
 /* Inspection table column widths (5 columns: Component, Work Description, Image, Status, Notes) */

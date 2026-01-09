@@ -5,7 +5,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
-  HomeIcon,
   BuildingOffice2Icon,
   ClipboardDocumentCheckIcon,
   PaintBrushIcon,
@@ -33,7 +32,6 @@ interface Building {
 
 
 const topLevelNavigation = [
-  { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
   { name: "Projects", href: "/dashboard/projects", icon: FolderIcon },
   { name: "Assessments", href: "/dashboard/assessments", icon: ClipboardDocumentCheckIcon },
   { name: "Selections", href: "/dashboard/selections", icon: PaintBrushIcon },
@@ -48,9 +46,10 @@ const bottomNavigation = [
 
 interface SidebarProps {
   className?: string
+  onLinkClick?: () => void
 }
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, onLinkClick }: SidebarProps) {
   const pathname = usePathname()
   const [communities, setCommunities] = useState<Community[]>([])
   const [buildings, setBuildings] = useState<Building[]>([])
@@ -126,7 +125,7 @@ export function Sidebar({ className }: SidebarProps) {
     buildings.filter((b) => b.communityId === communityId)
 
   return (
-    <div className={cn("flex h-full w-64 flex-col bg-white border-r border-gray-200", className)}>
+    <div className={cn("flex h-full w-[236px] flex-col bg-white border-r border-gray-200", className)}>
       <div className="flex h-16 items-center px-6 border-b border-gray-200">
         <h1 className="text-xl font-bold text-gray-900">RenoTrack</h1>
       </div>
@@ -134,14 +133,12 @@ export function Sidebar({ className }: SidebarProps) {
         <div className="flex-1 space-y-1">
           {/* Top level navigation items */}
           {topLevelNavigation.map((item) => {
-            // Dashboard should only be active on exactly /dashboard, not sub-paths
-            const isActive = item.href === "/dashboard" 
-              ? pathname === "/dashboard"
-              : pathname === item.href || pathname?.startsWith(item.href + "/")
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
             return (
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={onLinkClick}
                 className={cn(
                   "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
                   isActive
@@ -199,6 +196,7 @@ export function Sidebar({ className }: SidebarProps) {
                     </button>
                     <Link
                       href={`/dashboard/communities/${community.id}`}
+                      onClick={onLinkClick}
                       className={cn(
                         "flex-1 flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors truncate",
                         isCommunityActive
@@ -233,6 +231,7 @@ export function Sidebar({ className }: SidebarProps) {
                             <Link
                               key={building.id}
                               href={`/dashboard/buildings/${building.id}`}
+                              onClick={onLinkClick}
                               className={cn(
                                 "flex items-center px-3 py-1 text-xs rounded-md transition-colors truncate",
                                 isBuildingActive
@@ -261,6 +260,7 @@ export function Sidebar({ className }: SidebarProps) {
           {/* Add Community link */}
           <Link
             href="/dashboard/communities"
+            onClick={onLinkClick}
             className={cn(
               "flex items-center px-3 py-2 mt-2 text-sm font-medium rounded-md transition-colors",
               pathname === "/dashboard/communities"
@@ -282,6 +282,7 @@ export function Sidebar({ className }: SidebarProps) {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={onLinkClick}
                 className={cn(
                   "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
                   isActive

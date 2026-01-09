@@ -72,6 +72,13 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        residents: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
         _count: {
           select: {
             assessments: true,
@@ -84,6 +91,27 @@ export async function GET(request: NextRequest) {
         updatedAt: "desc",
       },
     })
+
+    // Ensure status exists for all projects - fetch explicitly if missing
+    for (const project of projects) {
+      const projectAny = project as any
+      if (!projectAny.status) {
+        try {
+          const [statusResult] = await prisma.$queryRawUnsafe<any[]>(
+            `SELECT "status" FROM "Project" WHERE id = $1`,
+            project.id
+          )
+          if (statusResult) {
+            projectAny.status = statusResult.status || "Pending"
+          } else {
+            projectAny.status = "Pending"
+          }
+        } catch (e) {
+          // Column doesn't exist or query failed, use default
+          projectAny.status = "Pending"
+        }
+      }
+    }
 
     return NextResponse.json(projects)
   } catch (error: any) {

@@ -104,11 +104,11 @@ export default function CommunitiesPage() {
 
   return (
     <>
-      <div className="space-y-6">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Communities</h1>
-            <p className="mt-1 text-sm text-gray-500">
+                            <h1 className="text-xl font-bold text-gray-900">Communities</h1>
+            <p className="mt-0.5 text-sm text-gray-500">
               Manage your residential communities and properties
             </p>
           </div>

@@ -468,6 +468,7 @@ model Project {
   tenantId    String
   name        String
   notes       String?
+  status      String?  @default("Pending") // "Pending" | "In Progress" | "Complete"
   vacancyDate DateTime?
   moveInDate  DateTime?
   createdAt   DateTime @default(now())

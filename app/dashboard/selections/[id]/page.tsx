@@ -31,9 +31,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { ArrowLeftIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowPathIcon, DocumentDuplicateIcon, PencilIcon, CheckIcon, XMarkIcon, Bars3Icon } from "@heroicons/react/24/outline"
+import { ArrowLeftIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowPathIcon, DocumentDuplicateIcon, PencilIcon, CheckIcon, XMarkIcon, Bars3Icon, PhotoIcon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
 import { CatalogItemSelectModal } from "@/components/CatalogItemSelectModal"
+import { MoodBoardModal } from "@/components/MoodBoardModal"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ImportTemplateModal } from "@/components/ImportTemplateModal"
 import {
@@ -193,6 +194,7 @@ export default function SelectionDetailPage() {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
   const [savingProject, setSavingProject] = useState(false)
+  const [moodBoardOpen, setMoodBoardOpen] = useState(false)
   
   // Bulk actions state
   const [bulkActions, setBulkActions] = useState({
@@ -954,7 +956,7 @@ export default function SelectionDetailPage() {
     })
   }
 
-  const handleExportPDF = async (variant: "rooms" | "categories") => {
+  const handleExportPDF = async (variant: "rooms" | "categories" | "vendor") => {
     setExportingPDF(true)
     try {
       console.log("Starting PDF export...", variant)
@@ -1074,10 +1076,12 @@ export default function SelectionDetailPage() {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => setImportTemplateOpen(true)}
+            onClick={() => {
+              setMoodBoardOpen(true)
+            }}
           >
-            <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
-            Import Template
+            <PhotoIcon className="h-4 w-4 mr-2" />
+            Mood Board
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -1109,6 +1113,14 @@ export default function SelectionDetailPage() {
                 }}
               >
                 Grouped by Category
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={exportingPDF}
+                onClick={async () => {
+                  await handleExportPDF("vendor")
+                }}
+              >
+                Grouped by Vendor
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1545,13 +1557,21 @@ export default function SelectionDetailPage() {
           </Select>
         </div>
         {viewMode === "rooms" && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button>
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Add Room
-              </Button>
-            </DropdownMenuTrigger>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setImportTemplateOpen(true)}
+            >
+              <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
+              Import Template
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button>
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Add Room
+                </Button>
+              </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setAddRoomOpen(true)}>
                 <PlusIcon className="h-4 w-4 mr-2" />
@@ -1563,6 +1583,7 @@ export default function SelectionDetailPage() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         )}
       </div>
 
@@ -1702,21 +1723,11 @@ export default function SelectionDetailPage() {
                           />
                         </TableHead>
                         {viewMode !== "rooms" && <TableHead className="w-[120px] min-w-[120px] border-r">Room</TableHead>}
-                        <TableHead className="w-[120px] min-w-[120px] border-r">
-                          <div className="flex flex-col">
-                            <span>Component</span>
-                            <span>/ Type</span>
-                          </div>
-                        </TableHead>
+                        <TableHead className="w-[120px] min-w-[120px] border-r">Component</TableHead>
                         <TableHead className="w-[280px] min-w-[200px] border-r">Catalog Item</TableHead>
                         <TableHead className="w-[100px] min-w-[100px] text-center border-r">Upgrade</TableHead>
                         <TableHead className="w-[120px] min-w-[120px] border-r">Vendor</TableHead>
-                        <TableHead className="w-[100px] min-w-[100px] border-r">
-                          <div className="flex flex-col">
-                            <span>Quantity</span>
-                            <span>/ Price</span>
-                          </div>
-                        </TableHead>
+                        <TableHead className="w-[100px] min-w-[100px] border-r">Amounts</TableHead>
                         <TableHead className="w-[300px] min-w-[200px]">Notes</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -3184,6 +3195,15 @@ export default function SelectionDetailPage() {
               console.error("Error refreshing catalog items:", error)
             }
           }}
+        />
+      )}
+
+      {/* Mood Board Modal */}
+      {selectionId && (
+        <MoodBoardModal
+          open={moodBoardOpen}
+          onOpenChange={setMoodBoardOpen}
+          selectionId={selectionId}
         />
       )}
     </div>

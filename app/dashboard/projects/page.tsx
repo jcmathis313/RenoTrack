@@ -4,14 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { StepProgress } from "@/components/ui/progress"
 import { PlusIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline"
 import { Input } from "@/components/ui/input"
 import {
@@ -56,6 +49,9 @@ interface Project {
   id: string
   name: string
   notes: string | null
+  status: string | null
+  vacancyDate: string | null
+  moveInDate: string | null
   createdAt: string
   updatedAt: string
   unit: {
@@ -71,6 +67,11 @@ interface Project {
   }
   assignments: {
     user: User
+  }[]
+  residents: {
+    id: string
+    firstName: string
+    lastName: string
   }[]
   _count: {
     assessments: number
@@ -164,7 +165,8 @@ export default function ProjectsPage() {
     }
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "—"
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -191,11 +193,11 @@ export default function ProjectsPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-xl font-bold text-gray-900">Projects</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
             Manage projects and track assessments, selections, and inspections
           </p>
         </div>
@@ -228,89 +230,96 @@ export default function ProjectsPage() {
               {searchQuery ? "No projects match your search" : "No projects yet"}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead>Assessments</TableHead>
-                    <TableHead>Selections</TableHead>
-                    <TableHead>Inspections</TableHead>
-                    <TableHead>Updated</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProjects.map((project) => (
-                    <TableRow key={project.id}>
-                      <TableCell className="font-medium">
-                        <Link
-                          href={`/dashboard/projects/${project.id}`}
-                          className="text-primary hover:underline"
-                        >
-                          {project.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="font-medium">Unit {project.unit.number}</div>
-                          <div className="text-gray-500">
-                            {project.unit.building.name}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredProjects.map((project) => {
+                const hasAssessment = project._count.assessments > 0
+                const hasSelection = project._count.selections > 0
+                const hasInspection = project._count.inspections > 0
+
+                return (
+                  <Card
+                    key={project.id}
+                    className="hover:shadow-lg transition-shadow cursor-pointer"
+                    onClick={() => router.push(`/dashboard/projects/${project.id}`)}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg">
+                            <Link
+                              href={`/dashboard/projects/${project.id}`}
+                              className="text-primary hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {project.name}
+                            </Link>
+                          </CardTitle>
+                          <div className="text-sm text-gray-600 space-y-0.5 mt-2">
+                            <div className="font-medium">Unit {project.unit.number}</div>
+                            <div className="text-gray-500">{project.unit.building.name}</div>
+                            <div className="text-gray-400 text-xs">
+                              {project.unit.building.community.name}
+                            </div>
                           </div>
-                          <div className="text-gray-400 text-xs">
-                            {project.unit.building.community.name}
-                          </div>
+                          {project.assignments.length > 0 && (
+                            <div className="mt-2 text-xs text-gray-500">
+                              Assigned: {project.assignments.slice(0, 2).map((a) => a.user.name || a.user.email).join(", ")}
+                              {project.assignments.length > 2 && ` +${project.assignments.length - 2} more`}
+                            </div>
+                          )}
+                          {project.residents.length > 0 && (
+                            <div className="mt-1 text-xs text-gray-500">
+                              Resident: {project.residents.map((r) => `${r.firstName} ${r.lastName}`).join(", ")}
+                            </div>
+                          )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {project.assignments.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            {project.assignments.slice(0, 2).map((assignment) => (
-                              <span key={assignment.user.id} className="text-sm">
-                                {assignment.user.name || assignment.user.email}
+                        <div className="text-right text-xs text-gray-500 space-y-1 ml-4">
+                          <div className="mb-2">
+                            {project.status === "Pending" && (
+                              <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                                Pending
                               </span>
-                            ))}
-                            {project.assignments.length > 2 && (
-                              <span className="text-xs text-gray-500">
-                                +{project.assignments.length - 2} more
+                            )}
+                            {project.status === "In Progress" && (
+                              <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                                In Progress
+                              </span>
+                            )}
+                            {project.status === "Complete" && (
+                              <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                                Complete
+                              </span>
+                            )}
+                            {!project.status && (
+                              <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                                Pending
                               </span>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">Unassigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                          {project._count.assessments}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">
-                          {project._count.selections}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                          {project._count.inspections}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {formatDate(project.updatedAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/dashboard/projects/${project.id}`}>
-                            View
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                          <div>
+                            <div className="font-medium text-gray-700">Vacancy Date:</div>
+                            <div>{formatDate(project.vacancyDate)}</div>
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-700">Move In Date:</div>
+                            <div>{formatDate(project.moveInDate)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <StepProgress
+                        hasAssessment={hasAssessment}
+                        hasSelection={hasSelection}
+                        hasInspection={hasInspection}
+                        assessmentCount={project._count.assessments}
+                        selectionCount={project._count.selections}
+                        inspectionCount={project._count.inspections}
+                      />
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )}
         </CardContent>

@@ -102,11 +102,11 @@ export default function SelectionsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Selections</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-xl font-bold text-gray-900">Selections</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
             Manage selection meetings and material choices
           </p>
         </div>
@@ -151,9 +151,7 @@ export default function SelectionsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Community</TableHead>
-                    <TableHead>Building</TableHead>
+                    <TableHead>Location</TableHead>
                     <TableHead>Based On Assessment</TableHead>
                     <TableHead>Rooms</TableHead>
                     <TableHead>Status</TableHead>
@@ -170,11 +168,13 @@ export default function SelectionsPage() {
                       <TableCell className="font-medium">
                         {selection.name}
                       </TableCell>
-                      <TableCell>Unit {selection.unit.number}</TableCell>
                       <TableCell>
-                        {selection.unit.building.community.name}
+                        <div className="flex flex-col space-y-0.5">
+                          <span className="font-medium">Unit {selection.unit.number}</span>
+                          <span className="text-sm text-gray-600">{selection.unit.building.community.name}</span>
+                          <span className="text-sm text-gray-500">{selection.unit.building.name}</span>
+                        </div>
                       </TableCell>
-                      <TableCell>{selection.unit.building.name}</TableCell>
                       <TableCell>
                         {selection.assessment ? (
                           <span className="text-sm text-gray-600">

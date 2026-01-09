@@ -31,9 +31,9 @@ export function MobileHeader() {
             className="fixed inset-0 z-50 bg-gray-900/50 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-64 lg:hidden">
+          <div className="fixed inset-y-0 left-0 z-50 w-[236px] lg:hidden">
             <div className="flex h-full">
-              <Sidebar className="relative" />
+              <Sidebar className="relative" onLinkClick={() => setSidebarOpen(false)} />
               <button
                 type="button"
                 className="absolute right-4 top-4 text-gray-400 hover:text-gray-500"

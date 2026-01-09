@@ -84,7 +84,7 @@ interface SelectionPDFContentProps {
   selection: Selection
   tenantSettings: TenantSettings | null
   componentStatuses: ComponentStatus[]
-  variant?: "rooms" | "categories"
+  variant?: "rooms" | "categories" | "vendor"
 }
 
 const getStatusColor = (statusName: string | null, statuses: ComponentStatus[]): string => {
@@ -160,7 +160,7 @@ export default function SelectionPDFContent({
 
   const totalCost = allComponents.reduce((sum, comp) => sum + (comp.totalCost || 0), 0)
 
-  // Group by category or room based on variant
+  // Group by category, room, or vendor based on variant
   let groupedData: Record<string, (DesignComponent & { roomName: string })[]>
   let sortedGroups: string[]
 
@@ -201,6 +201,24 @@ export default function SelectionPDFContent({
       return groups
     }, {})
     sortedGroups = selection.designRooms.map((room) => room.name)
+  } else if (variant === "vendor") {
+    // Group by vendor
+    groupedData = allComponents.reduce<
+      Record<string, (DesignComponent & { roomName: string })[]>
+    >((groups, component) => {
+      const vendorName = component.vendor?.name || "No Vendor Assigned"
+      if (!groups[vendorName]) {
+        groups[vendorName] = []
+      }
+      groups[vendorName].push(component)
+      return groups
+    }, {})
+    // Sort vendors alphabetically, with "No Vendor Assigned" at the end
+    sortedGroups = Object.keys(groupedData).sort((a, b) => {
+      if (a === "No Vendor Assigned") return 1
+      if (b === "No Vendor Assigned") return -1
+      return a.localeCompare(b)
+    })
   } else {
     // Group by category
     groupedData = allComponents.reduce<
@@ -320,21 +338,29 @@ export default function SelectionPDFContent({
             </div>
             {/* Separate table for this group */}
             {components.length > 0 ? (
-            <table className="component-table spec-table">
+            <table className={`component-table spec-table ${variant === "vendor" ? "vendor-variant" : ""}`}>
               <thead>
                 <tr>
+                  {variant === "vendor" && <th>Room</th>}
                   <th>Component</th>
                   <th>Work Description</th>
                   <th>Image</th>
                   <th>Upgrade</th>
                   <th className="quantity-cell">QTY</th>
                   <th>Notes</th>
-                  <th>Vendor</th>
+                  {variant !== "vendor" && <th>Vendor</th>}
                 </tr>
               </thead>
               <tbody>
                 {components.map((component, index) => (
                   <tr key={`${groupName}-${component.id}-${index}`}>
+                    {variant === "vendor" && (
+                      <td>
+                        <div className="component-type-title">
+                          {component.roomName}
+                        </div>
+                      </td>
+                    )}
                     <td>
                       <div className="component-type-title">
                         {component.componentName || component.componentType}
@@ -410,11 +436,13 @@ export default function SelectionPDFContent({
                         {component.notes || <span className="text-muted">—</span>}
                       </div>
                     </td>
-                    <td>
-                      <div className="text-xs">
-                        {component.vendor?.name || <span className="text-muted">—</span>}
-                      </div>
-                    </td>
+                    {variant !== "vendor" && (
+                      <td>
+                        <div className="text-xs">
+                          {component.vendor?.name || <span className="text-muted">—</span>}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

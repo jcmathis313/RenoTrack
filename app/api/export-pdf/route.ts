@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type") // "selection", "assessment", etc.
     const id = searchParams.get("id")
-    const variant = searchParams.get("variant") // "rooms" or "categories" for selections
+    const variant = searchParams.get("variant") // "rooms" or "categories" for selections, "rooms" or "vendor" for assessments
 
     if (!type || !id) {
       console.error("PDF Export: Missing parameters", { type, id })
@@ -59,9 +59,16 @@ export async function GET(request: NextRequest) {
         break
       case "assessment":
         pdfRoute = `/dashboard/assessments/${id}/pdf`
+        // Add variant parameter if provided
+        if (variant) {
+          pdfRoute += `?variant=${variant}`
+        }
         break
       case "inspection":
         pdfRoute = `/dashboard/inspections/${id}/pdf`
+        break
+      case "moodboard":
+        pdfRoute = `/dashboard/selections/${id}/moodboard-pdf`
         break
       default:
         return NextResponse.json(

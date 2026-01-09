@@ -30,6 +30,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { ArrowLeftIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ArrowUpIcon, ArrowDownIcon, ArrowDownTrayIcon, ArrowPathIcon, PencilIcon, CheckIcon, XMarkIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
@@ -897,49 +903,97 @@ export default function AssessmentDetailPage() {
             {assessment.unit.building.community.name} - {assessment.unit.building.name} - Unit {assessment.unit.number}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          disabled={exportingPDF}
-          onClick={async () => {
-            setExportingPDF(true)
-            try {
-              const response = await fetch(`/api/export-pdf?type=assessment&id=${assessmentId}`)
-              const contentType = response.headers.get("content-type")
-              if (!response.ok || !contentType?.includes("application/pdf")) {
-                const errorData = await response.json().catch(() => ({}))
-                throw new Error(
-                  errorData.error ||
-                    errorData.details ||
-                    `Failed to generate PDF: ${response.status} ${response.statusText}`
-                )
-              }
-              const blob = await response.blob()
-              const url = window.URL.createObjectURL(blob)
-              const a = document.createElement("a")
-              a.href = url
-              a.download = `assessment-${assessmentId}-${Date.now()}.pdf`
-              document.body.appendChild(a)
-              a.click()
-              window.URL.revokeObjectURL(url)
-              document.body.removeChild(a)
-            } catch (error: any) {
-              console.error("Error exporting PDF:", error)
-              alert(error?.message || "Failed to export PDF")
-            } finally {
-              setExportingPDF(false)
-            }
-          }}
-        >
-          {exportingPDF ? (
-            <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-          )}
-          <span className="hidden sm:inline">{exportingPDF ? "Generating PDF..." : "Export PDF"}</span>
-          <span className="sm:hidden">PDF</span>
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              disabled={exportingPDF}
+            >
+              {exportingPDF ? (
+                <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+              )}
+              <span className="hidden sm:inline">{exportingPDF ? "Generating PDF..." : "Export PDF"}</span>
+              <span className="sm:hidden">PDF</span>
+              <ChevronDownIcon className="h-4 w-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              disabled={exportingPDF}
+              onClick={async () => {
+                setExportingPDF(true)
+                try {
+                  const response = await fetch(`/api/export-pdf?type=assessment&id=${assessmentId}&variant=rooms`)
+                  const contentType = response.headers.get("content-type")
+                  if (!response.ok || !contentType?.includes("application/pdf")) {
+                    const errorData = await response.json().catch(() => ({}))
+                    throw new Error(
+                      errorData.error ||
+                        errorData.details ||
+                        `Failed to generate PDF: ${response.status} ${response.statusText}`
+                    )
+                  }
+                  const blob = await response.blob()
+                  const url = window.URL.createObjectURL(blob)
+                  const a = document.createElement("a")
+                  a.href = url
+                  a.download = `assessment-${assessmentId}-by-room-${Date.now()}.pdf`
+                  document.body.appendChild(a)
+                  a.click()
+                  window.URL.revokeObjectURL(url)
+                  document.body.removeChild(a)
+                } catch (error: any) {
+                  console.error("Error exporting PDF:", error)
+                  alert(error?.message || "Failed to export PDF")
+                } finally {
+                  setExportingPDF(false)
+                }
+              }}
+            >
+              <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+              Export by Room
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={exportingPDF}
+              onClick={async () => {
+                setExportingPDF(true)
+                try {
+                  const response = await fetch(`/api/export-pdf?type=assessment&id=${assessmentId}&variant=vendor`)
+                  const contentType = response.headers.get("content-type")
+                  if (!response.ok || !contentType?.includes("application/pdf")) {
+                    const errorData = await response.json().catch(() => ({}))
+                    throw new Error(
+                      errorData.error ||
+                        errorData.details ||
+                        `Failed to generate PDF: ${response.status} ${response.statusText}`
+                    )
+                  }
+                  const blob = await response.blob()
+                  const url = window.URL.createObjectURL(blob)
+                  const a = document.createElement("a")
+                  a.href = url
+                  a.download = `assessment-${assessmentId}-by-vendor-${Date.now()}.pdf`
+                  document.body.appendChild(a)
+                  a.click()
+                  window.URL.revokeObjectURL(url)
+                  document.body.removeChild(a)
+                } catch (error: any) {
+                  console.error("Error exporting PDF:", error)
+                  alert(error?.message || "Failed to export PDF")
+                } finally {
+                  setExportingPDF(false)
+                }
+              }}
+            >
+              <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+              Export by Vendor
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Assessment Info */}

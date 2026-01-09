@@ -289,16 +289,22 @@ export function CatalogItemSelectModal({
     }
   }
 
+  // Get selected item for breadcrumb
+  const selectedItem = selectedItemId 
+    ? catalogItems.find(item => item.id === selectedItemId)
+    : null
+
+  const breadcrumbText = selectedItem
+    ? `${selectedItem.category.name} > ${selectedItem.component.name}`
+    : "Select Catalog Item"
+
   return (
     <>
       <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent className="max-h-[90vh] h-[90vh] p-0">
           <div className="w-full max-w-full flex flex-col h-full">
-            <DrawerHeader className="px-6 pb-4 border-b">
-              <DrawerTitle>Select Catalog Item</DrawerTitle>
-              <DrawerDescription>
-                Search and filter through catalog items to find the material you need
-              </DrawerDescription>
+            <DrawerHeader className="px-6 pt-6 pb-4 border-b">
+              <DrawerTitle>{breadcrumbText}</DrawerTitle>
             </DrawerHeader>
 
             <div className="flex-1 overflow-hidden flex flex-col gap-4 px-6 py-4">
